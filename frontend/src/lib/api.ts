@@ -1,0 +1,291 @@
+import { apiClient, setTokens, clearTokens } from './api-client';
+import type {
+  User,
+  VerifyResponse,
+  NonceResponse,
+  TickETHEvent,
+  TicketTier,
+  Ticket,
+  Listing,
+  OrganizerRequest,
+  PaginatedResponse,
+  DashboardStats,
+  EventStats,
+  CheckinLog,
+} from './types';
+
+/* ════════════════════════════════════════════════════
+   AUTH
+   ════════════════════════════════════════════════════ */
+export const authApi = {
+  getNonce: async (address: string): Promise<NonceResponse> => {
+    const { data } = await apiClient.get<NonceResponse>('/auth/nonce', {
+      params: { address },
+    });
+    return data;
+  },
+
+  verify: async (message: string, signature: string): Promise<VerifyResponse> => {
+    const { data } = await apiClient.post<VerifyResponse>('/auth/verify', {
+      message,
+      signature,
+    });
+    setTokens(data.accessToken, data.refreshToken);
+    return data;
+  },
+
+  getMe: async (): Promise<User> => {
+    const { data } = await apiClient.get<User>('/auth/me');
+    return data;
+  },
+
+  logout: () => clearTokens(),
+};
+
+/* ════════════════════════════════════════════════════
+   USERS
+   ════════════════════════════════════════════════════ */
+export const usersApi = {
+  getMe: () => apiClient.get<User>('/users/me').then((r) => r.data),
+  updateProfile: (body: {
+    displayName?: string;
+    email?: string;
+    avatarUrl?: string;
+    consentGiven?: boolean;
+  }) => apiClient.patch<User>('/users/me', body).then((r) => r.data),
+  assignVolunteer: (walletAddress: string) =>
+    apiClient.post('/users/assign-volunteer', { walletAddress }),
+  revokeVolunteer: (walletAddress: string) =>
+    apiClient.post('/users/revoke-volunteer', { walletAddress }),
+};
+
+/* ════════════════════════════════════════════════════
+   EVENTS
+   ════════════════════════════════════════════════════ */
+export const eventsApi = {
+  list: (params?: { page?: number; limit?: number; city?: string; search?: string }) =>
+    apiClient
+      .get<PaginatedResponse<TickETHEvent>>('/events', { params })
+      .then((r) => r.data),
+
+  getById: (id: string) =>
+    apiClient.get<TickETHEvent>(`/events/${id}`).then((r) => r.data),
+
+  getMyEvents: (params?: { page?: number; limit?: number }) =>
+    apiClient
+      .get<PaginatedResponse<TickETHEvent>>('/events/organizer/mine', { params })
+      .then((r) => r.data),
+
+  create: (body: Record<string, any>) =>
+    apiClient.post<TickETHEvent>('/events', body).then((r) => r.data),
+
+  update: (id: string, body: Partial<TickETHEvent>) =>
+    apiClient.patch<TickETHEvent>(`/events/${id}`, body).then((r) => r.data),
+
+  publish: (id: string) =>
+    apiClient.post<TickETHEvent>(`/events/${id}/publish`).then((r) => r.data),
+
+  cancel: (id: string) =>
+    apiClient.post<TickETHEvent>(`/events/${id}/cancel`).then((r) => r.data),
+
+  getStats: (id: string) =>
+    apiClient.get<EventStats>(`/events/${id}/stats`).then((r) => r.data),
+
+  delete: (id: string) =>
+    apiClient.delete<{ success: boolean; message: string }>(`/events/${id}`).then((r) => r.data),
+};
+
+/* ════════════════════════════════════════════════════
+   TIERS
+   ════════════════════════════════════════════════════ */
+export const tiersApi = {
+  list: (eventId: string) =>
+    apiClient.get<TicketTier[]>(`/events/${eventId}/tiers`).then((r) => r.data),
+
+  availability: (eventId: string) =>
+    apiClient
+      .get<TicketTier[]>(`/events/${eventId}/tiers/availability`)
+      .then((r) => r.data),
+
+  create: (eventId: string, body: Omit<TicketTier, 'id' | 'event_id' | 'minted'>) =>
+    apiClient
+      .post<TicketTier>(`/events/${eventId}/tiers`, body)
+      .then((r) => r.data),
+
+  batchCreate: (eventId: string, tiers: Record<string, any>[]) =>
+    apiClient
+      .post<TicketTier[]>(`/events/${eventId}/tiers/batch`, tiers)
+      .then((r) => r.data),
+
+  update: (eventId: string, tierId: string, body: Partial<TicketTier>) =>
+    apiClient
+      .patch<TicketTier>(`/events/${eventId}/tiers/${tierId}`, body)
+      .then((r) => r.data),
+};
+
+/* ════════════════════════════════════════════════════
+   TICKETS
+   ════════════════════════════════════════════════════ */
+export const ticketsApi = {
+  mine: (params?: { page?: number; limit?: number }) =>
+    apiClient
+      .get<PaginatedResponse<Ticket>>('/tickets/mine', { params })
+      .then((r) => r.data),
+
+  getById: (id: string) =>
+    apiClient.get<Ticket>(`/tickets/${id}`).then((r) => r.data),
+
+  byEvent: (eventId: string, params?: { page?: number; limit?: number }) =>
+    apiClient
+      .get<PaginatedResponse<Ticket>>(`/tickets/event/${eventId}`, { params })
+      .then((r) => r.data),
+
+  recordMint: (body: Record<string, any>) =>
+    apiClient.post<Ticket>('/tickets/record-mint', body).then((r) => r.data),
+};
+
+/* ════════════════════════════════════════════════════
+   MARKETPLACE
+   ════════════════════════════════════════════════════ */
+export const marketplaceApi = {
+  listings: (params?: { eventId?: string; page?: number; limit?: number; status?: string }) =>
+    apiClient
+      .get<PaginatedResponse<Listing>>('/marketplace/listings', { params })
+      .then((r) => r.data),
+
+  getById: (id: string) =>
+    apiClient.get<Listing>(`/marketplace/listings/${id}`).then((r) => r.data),
+
+  myListings: (params?: { page?: number; limit?: number }) =>
+    apiClient
+      .get<PaginatedResponse<Listing>>('/marketplace/my-listings', { params })
+      .then((r) => r.data),
+
+  create: (body: { ticketId: string; price: string; txHash?: string }) =>
+    apiClient.post<Listing>('/marketplace/list', body).then((r) => r.data),
+
+  completeSale: (listingId: string, body?: Record<string, any>) =>
+    apiClient.post(`/marketplace/complete-sale/${listingId}`, body),
+
+  cancel: (listingId: string) =>
+    apiClient.post(`/marketplace/cancel/${listingId}`),
+
+  history: (ticketId: string) =>
+    apiClient.get<Listing[]>(`/marketplace/history/${ticketId}`).then((r) => r.data),
+
+  stats: (eventId: string) =>
+    apiClient.get(`/marketplace/stats/${eventId}`).then((r) => r.data),
+};
+
+/* ════════════════════════════════════════════════════
+   ORGANIZER REQUESTS
+   ════════════════════════════════════════════════════ */
+export const organizerRequestsApi = {
+  submit: (body: Record<string, any>) =>
+    apiClient.post<OrganizerRequest>('/organizer-requests', body).then((r) => r.data),
+
+  mine: () =>
+    apiClient.get<OrganizerRequest[]>('/organizer-requests/mine').then((r) => r.data),
+
+  list: (params?: { page?: number; limit?: number; status?: string }) =>
+    apiClient
+      .get<PaginatedResponse<OrganizerRequest>>('/organizer-requests', { params })
+      .then((r) => r.data),
+
+  pending: (params?: { page?: number; limit?: number }) =>
+    apiClient
+      .get<PaginatedResponse<OrganizerRequest>>('/organizer-requests/pending', { params })
+      .then((r) => r.data),
+
+  review: (id: string, body: { status: 'approved' | 'rejected'; feedback?: string }) =>
+    apiClient.patch(`/organizer-requests/${id}/review`, body),
+};
+
+/* ════════════════════════════════════════════════════
+   ADMIN
+   ════════════════════════════════════════════════════ */
+export const adminApi = {
+  dashboard: () =>
+    apiClient.get<DashboardStats>('/admin/dashboard').then((r) => r.data),
+
+  users: (params?: { page?: number; limit?: number; role?: string }) =>
+    apiClient
+      .get<PaginatedResponse<User>>('/admin/users', { params })
+      .then((r) => r.data),
+
+  changeRole: (userId: string, role: string) =>
+    apiClient.patch(`/admin/users/${userId}/role`, { role }),
+
+  deleteUser: (userId: string) => apiClient.delete(`/admin/users/${userId}`),
+};
+
+/* ════════════════════════════════════════════════════
+   BLOCKCHAIN
+   ════════════════════════════════════════════════════ */
+export const blockchainApi = {
+  deploy: (eventIdOrBody: string | Record<string, any>) => {
+    const body = typeof eventIdOrBody === 'string' ? { eventId: eventIdOrBody } : eventIdOrBody;
+    return apiClient.post('/blockchain/deploy', body).then((r) => r.data);
+  },
+
+  verify: (contractAddress: string, tokenId: number, owner?: string) =>
+    apiClient
+      .get(`/blockchain/verify/${contractAddress}/${tokenId}`, {
+        params: owner ? { owner } : undefined,
+      })
+      .then((r) => r.data),
+
+  status: () => apiClient.get('/blockchain/status').then((r) => r.data),
+};
+
+/* ════════════════════════════════════════════════════
+   IPFS
+   ════════════════════════════════════════════════════ */
+export const ipfsApi = {
+  pinMetadata: (body: {
+    name: string;
+    description: string;
+    image?: string;
+    attributes?: Array<{ trait_type: string; value: string | number }>;
+  }) => apiClient.post('/ipfs/pin-metadata', body).then((r) => r.data),
+};
+
+/* ════════════════════════════════════════════════════
+   CHECK-IN (Organizer dashboard)
+   ════════════════════════════════════════════════════ */
+export const checkinApi = {
+  liveCount: (eventId: string) =>
+    apiClient
+      .get<{ count: number }>(`/checkin/event/${eventId}/count`)
+      .then((r) => r.data),
+
+  logs: (eventId: string, params?: { page?: number; limit?: number }) =>
+    apiClient
+      .get<PaginatedResponse<CheckinLog>>(`/checkin/event/${eventId}/logs`, { params })
+      .then((r) => r.data),
+};
+
+/* ════════════════════════════════════════════════════
+   UPLOADS (Image upload for avatars & banners)
+   ════════════════════════════════════════════════════ */
+export const uploadsApi = {
+  uploadAvatar: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return apiClient
+      .post<{ url: string; message: string }>('/uploads/avatar', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data);
+  },
+
+  uploadBanner: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return apiClient
+      .post<{ url: string; message: string }>('/uploads/banner', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data);
+  },
+};
