@@ -9,8 +9,10 @@ import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/Button';
 import { Skeleton } from '@/components/Skeleton';
 import { useAuthStore } from '@/lib/store';
+import { useRequireAuth } from '@/lib/hooks';
 import { adminApi } from '@/lib/api';
 import { parseError } from '@/lib/error-parser';
+import { TiltCard, SpotlightSection } from '@/components/ui/AnimatedElements';
 import { toast } from 'sonner';
 import type { DashboardStats } from '@/lib/types';
 
@@ -24,6 +26,7 @@ const fadeUp = {
 };
 
 export default function AdminDashboardPage() {
+  useRequireAuth(['admin']);
   const { user } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +72,10 @@ export default function AdminDashboardPage() {
       <main className="flex-1 px-4 py-10">
         <div className="mx-auto max-w-7xl">
           <div className="mb-8">
-            <h1 className="text-3xl font-extrabold">Admin Dashboard</h1>
+            <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Control Panel</span>
+            <h1 className="mt-2 text-4xl font-extrabold">
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Admin</span>{' '}Dashboard
+            </h1>
             <p className="mt-1 text-muted">Platform overview and management</p>
           </div>
 
@@ -167,8 +173,8 @@ export default function AdminDashboardPage() {
                 initial="hidden" animate="visible" variants={fadeUp} custom={i}
               >
                 <Link href={link.href} className="group block">
-                  <div className="rounded-2xl border border-border bg-surface p-6 hover:border-primary/40 transition-all">
-                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                  <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10 transition-all">
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-accent/5 group-hover:from-primary/25 group-hover:to-accent/10 transition-colors shadow-lg shadow-primary/5">
                       {link.icon}
                     </div>
                     <h3 className="text-lg font-bold group-hover:text-primary transition-colors">

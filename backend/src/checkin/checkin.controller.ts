@@ -70,6 +70,12 @@ export class CheckinController {
     return { eventId, count };
   }
 
+  @Get('status/:checkinLogId')
+  @ApiOperation({ summary: 'Get status of a check-in log (used for polling)' })
+  async getCheckinStatus(@Param('checkinLogId') checkinLogId: string) {
+    return this.checkin.getCheckinStatus(checkinLogId);
+  }
+
   @Get('event/:eventId/logs')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ORGANIZER, UserRole.ADMIN)

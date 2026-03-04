@@ -13,12 +13,13 @@ import { Modal } from '@/components/Modal';
 import { eventsApi, tiersApi, blockchainApi, checkinApi } from '@/lib/api';
 import { BLOCK_EXPLORER } from '@/lib/constants';
 import { formatDate, formatDateTime, formatPrice, getTierPrice, shortenAddress, formatCompact } from '@/lib/utils';
-import { useCopyToClipboard } from '@/lib/hooks';
+import { useCopyToClipboard, useRequireAuth } from '@/lib/hooks';
 import { parseError } from '@/lib/error-parser';
 import { toast } from 'sonner';
 import type { TickETHEvent, TicketTier } from '@/lib/types';
 
 export default function ManageEventPage() {
+  useRequireAuth(['organizer', 'admin']);
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
@@ -188,7 +189,9 @@ export default function ManageEventPage() {
           <div className="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-extrabold">{event.name || event.title}</h1>
+                <h1 className="text-3xl font-extrabold">
+                  <span className="bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">{event.name || event.title}</span>
+                </h1>
                 <Badge status={event.status} />
               </div>
               <p className="mt-2 text-muted">
@@ -257,10 +260,13 @@ export default function ManageEventPage() {
           {/* Contract info */}
           {(event.contractAddress || event.contract_address) && (
             <motion.div
-              className="mb-8 rounded-2xl border border-border bg-surface p-6"
+              className="mb-8 rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             >
-              <h2 className="text-lg font-bold mb-4">Smart Contract</h2>
+              <h2 className="text-lg font-bold mb-4">
+                Smart{' '}
+                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Contract</span>
+              </h2>
               <div className="flex items-center gap-3">
                 <span className="text-sm text-muted">Address:</span>
                 <a
@@ -287,8 +293,11 @@ export default function ManageEventPage() {
           )}
 
           {/* Tiers */}
-          <div className="rounded-2xl border border-border bg-surface p-6">
-            <h2 className="text-lg font-bold mb-4">Ticket Tiers</h2>
+          <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6">
+            <h2 className="text-lg font-bold mb-4">
+              Ticket{' '}
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Tiers</span>
+            </h2>
             {tiers.length === 0 ? (
               <p className="text-sm text-muted">No tiers configured</p>
             ) : (
@@ -300,7 +309,7 @@ export default function ManageEventPage() {
                   return (
                     <div
                       key={tier.id}
-                      className="rounded-xl border border-border bg-background p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                      className="rounded-xl border border-border/30 bg-background/80 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:border-primary/20 transition-all"
                     >
                       <div>
                       <div className="flex items-center gap-3">

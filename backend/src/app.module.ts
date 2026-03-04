@@ -1,7 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { SupabaseModule } from './common/supabase/supabase.module';
+import { RequestIdMiddleware, SecurityLoggerMiddleware } from './common/middleware';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { OrganizerRequestsModule } from './organizer-requests/organizer-requests.module';
@@ -16,12 +19,33 @@ import { MarketplaceModule } from './marketplace/marketplace.module';
 import { IpfsModule } from './ipfs/ipfs.module';
 import { QueuesModule } from './queues/queues.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { DpdpModule } from './dpdp/dpdp.module';
 import { HealthController } from './health.controller';
 
 @Module({
   imports: [
     // Global config from .env
     ConfigModule.forRoot({ isGlobal: true }),
+
+    // ── Rate Limiting ───────────────────────────────────────
+    // Default: 100 requests per 60 seconds per IP
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000,   // 1 second
+        limit: 10,   // 10 requests per second
+      },
+      {
+        name: 'medium',
+        ttl: 60000,  // 1 minute
+        limit: 100,  // 100 requests per minute
+      },
+      {
+        name: 'long',
+        ttl: 3600000, // 1 hour
+        limit: 1000,  // 1000 requests per hour
+      },
+    ]),
 
     // BullMQ — Redis queue
     BullModule.forRoot({
@@ -50,7 +74,23 @@ import { HealthController } from './health.controller';
     IpfsModule,
     QueuesModule,
     UploadsModule,
+
+    // Phase 6: DPDP compliance
+    DpdpModule,
   ],
   controllers: [HealthController],
+  providers: [
+    // Apply throttler globally to all routes
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(RequestIdMiddleware, SecurityLoggerMiddleware)
+      .forRoutes('*');
+  }
+}

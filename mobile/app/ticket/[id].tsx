@@ -23,6 +23,7 @@ import { QRCodeDisplay } from '../../src/components/QRCodeDisplay';
 import { TicketCardSkeleton } from '../../src/components/Skeleton';
 import { useTicket } from '../../src/hooks/useTickets';
 import { useTicketQR } from '../../src/hooks/useCheckin';
+import { useCheckin } from '../../src/providers/CheckinProvider';
 import { showToast } from '../../src/services/toast';
 import { analytics } from '../../src/services/analytics';
 import {
@@ -47,12 +48,20 @@ export default function TicketDetailScreen() {
   const { ticket, loading, error, refresh } = useTicket(id);
   const eventId = ticket?.event_id ?? '';
   const { qrPayload, loading: qrLoading, error: qrError, refresh: refreshQR } = useTicketQR(id, eventId);
+  const { joinTicket } = useCheckin();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     analytics.screenView('ticket_detail');
   }, []);
+
+  // Join the ticket WebSocket room so the attendee receives confirmationRequest
+  useEffect(() => {
+    if (id && ticket?.status === 'minted') {
+      joinTicket(id);
+    }
+  }, [id, ticket?.status, joinTicket]);
 
   useEffect(() => {
     if (ticket) {

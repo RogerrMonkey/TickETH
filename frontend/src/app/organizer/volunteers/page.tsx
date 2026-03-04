@@ -8,6 +8,7 @@ import { Footer } from '@/components/Footer';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { useAuthStore } from '@/lib/store';
+import { useRequireAuth } from '@/lib/hooks';
 import { usersApi, adminApi } from '@/lib/api';
 import { BLOCK_EXPLORER } from '@/lib/constants';
 import { shortenAddress, formatDate } from '@/lib/utils';
@@ -19,6 +20,7 @@ import type { User } from '@/lib/types';
 const isValidAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr);
 
 export default function VolunteerManagementPage() {
+  useRequireAuth(['organizer', 'admin']);
   const { user } = useAuthStore();
   const router = useRouter();
 
@@ -176,7 +178,11 @@ export default function VolunteerManagementPage() {
 
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-extrabold">Volunteer Management</h1>
+            <span className="text-xs font-bold text-accent uppercase tracking-[0.3em]">Team</span>
+            <h1 className="mt-2 text-4xl font-extrabold">
+              Volunteer{' '}
+              <span className="bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">Management</span>
+            </h1>
             <p className="mt-2 text-muted">
               Assign volunteer roles to attendees by their wallet address. Volunteers gain access
               to the ticket scanner on the mobile app for check-in at events.
@@ -184,7 +190,7 @@ export default function VolunteerManagementPage() {
           </div>
 
           {/* How it works */}
-          <div className="mb-8 rounded-2xl border border-border bg-surface p-6">
+          <div className="mb-8 rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
                 <circle cx="12" cy="12" r="10" />
@@ -210,7 +216,7 @@ export default function VolunteerManagementPage() {
 
           {/* Assign Volunteer Form */}
           <motion.div
-            className="mb-8 rounded-2xl border border-border bg-surface p-6"
+            className="mb-8 rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6 shadow-xl shadow-primary/5"
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
           >
             <h2 className="text-lg font-bold mb-4">Assign Volunteer</h2>
@@ -276,7 +282,7 @@ export default function VolunteerManagementPage() {
 
           {/* Current Volunteers (admin only) */}
           {isAdmin && (
-            <div className="rounded-2xl border border-border bg-surface p-6">
+            <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold">Current Volunteers</h2>
                 <Button
@@ -313,7 +319,7 @@ export default function VolunteerManagementPage() {
                       return (
                         <motion.div
                           key={v.id}
-                          className="flex items-center justify-between rounded-xl border border-border bg-background p-4"
+                          className="flex items-center justify-between rounded-xl border border-border/30 bg-background/80 p-4 hover:border-primary/20 transition-all"
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: 10 }}

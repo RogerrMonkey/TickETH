@@ -9,6 +9,7 @@ import { Button } from '@/components/Button';
 import { TableRowSkeleton } from '@/components/Skeleton';
 import { Modal } from '@/components/Modal';
 import { useAuthStore } from '@/lib/store';
+import { useRequireAuth } from '@/lib/hooks';
 import { adminApi } from '@/lib/api';
 import { BLOCK_EXPLORER } from '@/lib/constants';
 import { shortenAddress, formatDate } from '@/lib/utils';
@@ -17,6 +18,7 @@ import { toast } from 'sonner';
 import type { User, UserRole } from '@/lib/types';
 
 export default function AdminUsersPage() {
+  useRequireAuth(['admin']);
   const { user: currentUser } = useAuthStore();
   const isAdmin = currentUser?.role === 'admin';
 
@@ -120,7 +122,11 @@ export default function AdminUsersPage() {
               </svg>
               Back to Admin
             </button>
-            <h1 className="text-3xl font-extrabold">User Management</h1>
+            <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Manage</span>
+            <h1 className="mt-2 text-4xl font-extrabold">
+              User{' '}
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Management</span>
+            </h1>
             <p className="mt-1 text-muted">{users.length} total users</p>
           </div>
 
@@ -143,13 +149,13 @@ export default function AdminUsersPage() {
                 placeholder="Search by wallet, email, or name..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-border bg-surface pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-xl border border-border/50 bg-background/80 pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 backdrop-blur-sm"
               />
             </div>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none"
+              className="rounded-xl border border-border/50 bg-background/80 px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 backdrop-blur-sm"
             >
               <option value="all">All Roles</option>
               <option value="attendee">Attendee</option>
@@ -160,11 +166,11 @@ export default function AdminUsersPage() {
           </div>
 
           {/* Table */}
-          <div className="rounded-2xl border border-border bg-surface overflow-hidden">
+          <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm overflow-hidden shadow-xl shadow-primary/5">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-border bg-surface-light">
+                  <tr className="border-b border-border/30 bg-gradient-to-r from-surface-light/80 to-surface/80">
                     <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Wallet</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Display Name</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider">Role</th>

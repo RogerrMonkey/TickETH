@@ -42,11 +42,18 @@ export class MarketplaceService {
       throw new BadRequestException('Ticket is already listed');
     }
 
+    // Resolve fields from the ticket record
+    const eventId = ticket.event_id;
+    const tierId = ticket.tier_id;
+    const contractAddress = ticket.contract_address;
+    const tokenId = ticket.token_id;
+    const sellerWallet = ticket.owner_wallet;
+
     // Check tier allows resale
     const { data: tier } = await this.supabase.admin
       .from('ticket_tiers')
-      .select('resale_allowed, max_resales, max_price_deviation_bps')
-      .eq('id', dto.tierId)
+      .select('resale_allowed, max_resales, max_price_deviation_bps, price, price_wei')
+      .eq('id', tierId)
       .single();
 
     if (!tier) throw new NotFoundException('Tier not found');
@@ -61,20 +68,25 @@ export class MarketplaceService {
       );
     }
 
+    // Resolve prices
+    const askingPrice = dto.askingPrice ?? 0;
+    const originalPrice = tier.price ?? 0;
+    const originalPriceWei = tier.price_wei ?? '0';
+
     // Create the listing
     const { data: listing, error } = await this.supabase.admin
       .from('marketplace_listings')
       .insert({
         ticket_id: dto.ticketId,
-        event_id: dto.eventId,
-        tier_id: dto.tierId,
-        seller_wallet: dto.sellerWallet.toLowerCase(),
-        contract_address: dto.contractAddress.toLowerCase(),
-        token_id: dto.tokenId,
-        asking_price: dto.askingPrice,
+        event_id: eventId,
+        tier_id: tierId,
+        seller_wallet: sellerWallet.toLowerCase(),
+        contract_address: contractAddress.toLowerCase(),
+        token_id: tokenId,
+        asking_price: askingPrice,
         asking_price_wei: dto.askingPriceWei,
-        original_price: dto.originalPrice,
-        original_price_wei: dto.originalPriceWei,
+        original_price: originalPrice,
+        original_price_wei: originalPriceWei,
         status: ListingStatus.ACTIVE,
         listing_tx_hash: dto.listingTxHash,
       })
@@ -90,20 +102,20 @@ export class MarketplaceService {
       .eq('id', dto.ticketId);
 
     await this.audit.log({
-      actorWallet: dto.sellerWallet.toLowerCase(),
+      actorWallet: sellerWallet.toLowerCase(),
       action: AuditAction.TICKET_LISTED,
       entityType: 'marketplace_listing',
       entityId: listing.id,
       details: {
         ticket_id: dto.ticketId,
-        token_id: dto.tokenId,
+        token_id: tokenId,
         asking_price_wei: dto.askingPriceWei,
-        event_id: dto.eventId,
+        event_id: eventId,
       },
     });
 
     this.logger.log(
-      `Ticket listed: ${dto.tokenId} on ${dto.contractAddress} for ${dto.askingPriceWei} wei`,
+      `Ticket listed: ${tokenId} on ${contractAddress} for ${dto.askingPriceWei} wei`,
     );
 
     return listing;

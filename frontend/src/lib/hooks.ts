@@ -1,6 +1,36 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from './store';
+import type { UserRole } from './types';
+
+/* ─── useRequireAuth ──────────────────────────────────── */
+/**
+ * Redirect to home page when the user disconnects their wallet
+ * or is not authenticated. Optionally require specific roles.
+ *
+ * Usage:
+ *   useRequireAuth();                         // any authenticated user
+ *   useRequireAuth(['organizer', 'admin']);    // specific roles only
+ */
+export function useRequireAuth(requiredRoles?: UserRole[]) {
+  const { user, hydrated } = useAuthStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!hydrated) return;           // wait for auth state to load
+    if (!user) {
+      router.replace('/');
+      return;
+    }
+    if (requiredRoles && !requiredRoles.includes(user.role)) {
+      router.replace('/');
+    }
+  }, [user, hydrated, requiredRoles, router]);
+
+  return { user, hydrated, isAuthed: !!user };
+}
 
 /* ─── useDebounce ─────────────────────────────────────── */
 export function useDebounce<T>(value: T, delay = 300): T {
@@ -47,52 +77,6 @@ export function useCountdown(targetDate: string | Date): CountdownResult {
   return countdown;
 }
 
-/* ─── useIntersectionObserver (infinite scroll) ───────── */
-export function useIntersectionObserver(
-  callback: () => void,
-  options?: IntersectionObserverInit,
-) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) callback();
-    }, { threshold: 0, rootMargin: '200px', ...options });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [callback, options]);
-
-  return ref;
-}
-
-/* ─── useLocalStorage ─────────────────────────────────── */
-export function useLocalStorage<T>(key: string, initialValue: T) {
-  const [stored, setStored] = useState<T>(() => {
-    if (typeof window === 'undefined') return initialValue;
-    try {
-      const item = window.localStorage.getItem(key);
-      return item ? (JSON.parse(item) as T) : initialValue;
-    } catch {
-      return initialValue;
-    }
-  });
-
-  const setValue = useCallback(
-    (value: T | ((val: T) => T)) => {
-      const valueToStore = value instanceof Function ? value(stored) : value;
-      setStored(valueToStore);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
-      }
-    },
-    [key, stored],
-  );
-
-  return [stored, setValue] as const;
-}
-
 /* ─── useCopyToClipboard ──────────────────────────────── */
 export function useCopyToClipboard(resetDelay = 2000) {
   const [copied, setCopied] = useState(false);
@@ -112,21 +96,6 @@ export function useCopyToClipboard(resetDelay = 2000) {
   );
 
   return { copied, copy };
-}
-
-/* ─── useMediaQuery ───────────────────────────────────── */
-export function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia(query);
-    setMatches(mql.matches);
-    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }, [query]);
-
-  return matches;
 }
 
 /* ─── useScrollLock ───────────────────────────────────── */

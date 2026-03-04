@@ -21,6 +21,7 @@ import { useAuthStore } from '@/lib/store';
 import { cn } from '@/lib/cn';
 import { useDebounce } from '@/lib/hooks';
 import { parseError } from '@/lib/error-parser';
+import { TiltCard, SpotlightSection, GlowBorder } from '@/components/ui/AnimatedElements';
 import { toast } from 'sonner';
 import type { Listing, Ticket } from '@/lib/types';
 
@@ -143,8 +144,10 @@ function MarketplacePage() {
 
     // Sort
     result = [...result].sort((a, b) => {
-      if (sort === 'price-asc') return Number(BigInt(a.price) - BigInt(b.price));
-      if (sort === 'price-desc') return Number(BigInt(b.price) - BigInt(a.price));
+      const aPrice = BigInt(a.asking_price_wei || a.askingPriceWei || a.price || '0');
+      const bPrice = BigInt(b.asking_price_wei || b.askingPriceWei || b.price || '0');
+      if (sort === 'price-asc') return Number(aPrice - bPrice);
+      if (sort === 'price-desc') return Number(bPrice - aPrice);
       return new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime();
     });
 
@@ -167,11 +170,13 @@ function MarketplacePage() {
         address: MARKETPLACE_ADDRESS,
       });
 
+      const listingPriceWei = listing.asking_price_wei || listing.askingPriceWei || listing.price || '0';
+
       const tx = prepareContractCall({
         contract,
         method: 'function buyListing(uint256 listingId) payable',
-        params: [BigInt(listing.listingId ?? 0)],
-        value: BigInt(listing.price),
+        params: [BigInt(listing.listingId ?? listing.listing_id ?? 0)],
+        value: BigInt(listingPriceWei),
       });
 
       setTxStep('awaiting-signature');
@@ -215,7 +220,8 @@ function MarketplacePage() {
     try {
       await marketplaceApi.create({
         ticketId: listingTicket.id,
-        price: toWei(listPrice).toString(),
+        askingPriceWei: toWei(listPrice).toString(),
+        askingPrice: parseFloat(listPrice) || 0,
       });
       setShowListModal(false);
       setListPrice('');
@@ -239,7 +245,10 @@ function MarketplacePage() {
           {/* Header */}
           <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-extrabold">Marketplace</h1>
+              <span className="text-xs font-bold text-accent uppercase tracking-[0.3em]">Peer-to-Peer</span>
+              <h1 className="mt-2 text-4xl font-extrabold">
+                <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">Marketplace</span>
+              </h1>
               <p className="mt-1 text-muted">Buy and sell NFT tickets peer-to-peer</p>
             </div>
             {user && (
@@ -254,7 +263,7 @@ function MarketplacePage() {
           </div>
 
           {/* Search + Sort */}
-          <div className="mb-8 flex flex-col sm:flex-row gap-3">
+          <div className="mb-8 flex flex-col sm:flex-row gap-3 rounded-2xl border border-border/30 bg-surface/60 backdrop-blur-sm p-4">
             <div className="relative flex-1 max-w-md">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
@@ -264,13 +273,13 @@ function MarketplacePage() {
                 placeholder="Search by event or seller..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-border bg-surface pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-xl border border-border/50 bg-background/80 pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 backdrop-blur-sm"
               />
             </div>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
-              className="rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none"
+              className="rounded-xl border border-border/50 bg-background/80 px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 backdrop-blur-sm"
             >
               {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -333,8 +342,9 @@ function MarketplacePage() {
                       key={listing.id}
                       initial="hidden" animate="visible" variants={fadeUp} custom={i}
                     >
-                      <div className="group rounded-2xl border border-border bg-surface overflow-hidden hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all">
-                        <div className="h-36 bg-gradient-to-br from-primary/15 to-accent/10 flex items-center justify-center relative">
+                      <TiltCard glowColor="rgba(0, 217, 255, 0.1)">
+                      <div className="group rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm overflow-hidden hover:border-accent/40 hover:shadow-xl hover:shadow-accent/10 transition-all">
+                        <div className="h-36 bg-gradient-to-br from-primary/15 via-accent/5 to-accent/10 flex items-center justify-center relative">
                           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary/40">
                             <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
                           </svg>
@@ -356,9 +366,9 @@ function MarketplacePage() {
                             <p className="text-xs text-muted">Listed {formatRelativeTime(createdDate)}</p>
                           )}
 
-                          <div className="flex items-center justify-between pt-2 border-t border-border">
+                          <div className="flex items-center justify-between pt-2 border-t border-border/30">
                             <span className="text-lg font-bold text-primary tabular-nums">
-                              {formatPrice(listing.price)}
+                              {formatPrice(listing.asking_price_wei || listing.askingPriceWei || listing.price)}
                             </span>
 
                             {isOwn ? (
@@ -371,6 +381,7 @@ function MarketplacePage() {
                           </div>
                         </div>
                       </div>
+                      </TiltCard>
                     </motion.div>
                   );
                 })}
@@ -393,7 +404,7 @@ function MarketplacePage() {
               <div className="mb-4 rounded-xl bg-surface-light p-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted">Price</span>
-                  <span className="font-bold text-primary">{formatPrice(buyingListing.price)}</span>
+                  <span className="font-bold text-primary">{formatPrice(buyingListing.asking_price_wei || buyingListing.askingPriceWei || buyingListing.price)}</span>
                 </div>
               </div>
               <TransactionTracker

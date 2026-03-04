@@ -81,7 +81,7 @@ export class OrganizerRequestsService {
 
     const { data, error, count } = await this.supabase.admin
       .from('organizer_requests')
-      .select('*, users!inner(display_name, email)', { count: 'exact' })
+      .select('*, users!organizer_requests_user_id_fkey(display_name, email)', { count: 'exact' })
       .eq('status', RequestStatus.PENDING)
       .order('submitted_at', { ascending: true })
       .range(from, to);
@@ -103,7 +103,7 @@ export class OrganizerRequestsService {
 
     let query = this.supabase.admin
       .from('organizer_requests')
-      .select('*, users!inner(display_name, email)', { count: 'exact' })
+      .select('*, users!organizer_requests_user_id_fkey(display_name, email)', { count: 'exact' })
       .order('submitted_at', { ascending: false })
       .range(from, to);
 

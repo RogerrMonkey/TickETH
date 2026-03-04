@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { VerifyDto } from './dto/verify.dto';
 import { CurrentUser, Public } from '../common/decorators';
@@ -22,6 +23,7 @@ export class AuthController {
 
   @Public()
   @Get('nonce')
+  @Throttle({ medium: { ttl: 60000, limit: 10 } }) // 10 nonce requests / minute
   @ApiOperation({ summary: 'Get a nonce for SIWE sign-in' })
   getNonce(@Query('address') address: string) {
     return this.auth.getNonce(address);
@@ -29,6 +31,7 @@ export class AuthController {
 
   @Public()
   @Post('verify')
+  @Throttle({ medium: { ttl: 60000, limit: 5 } }) // 5 verify attempts / minute
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify SIWE signature and get JWT' })
   verify(@Body() dto: VerifyDto) {

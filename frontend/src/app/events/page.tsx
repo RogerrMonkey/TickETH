@@ -15,6 +15,7 @@ import { formatDate, formatPrice, getTierPrice } from '@/lib/utils';
 import { cn } from '@/lib/cn';
 import { useDebounce } from '@/lib/hooks';
 import { getErrorMessage } from '@/lib/error-parser';
+import { SpotlightSection, TiltCard } from '@/components/ui/AnimatedElements';
 import type { TickETHEvent, TicketTier } from '@/lib/types';
 
 const fadeUp = {
@@ -134,9 +135,13 @@ function EventsContent() {
       <main className="flex-1 px-4 py-10">
         <div className="mx-auto max-w-7xl">
           {/* Header */}
-          <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div className="mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-extrabold">Browse Events</h1>
+              <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Discover</span>
+              <h1 className="mt-2 text-4xl font-extrabold">
+                Browse{' '}
+                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Events</span>
+              </h1>
               <p className="mt-2 text-muted">
                 {loading ? 'Loading...' : `${total} event${total !== 1 ? 's' : ''} found`}
               </p>
@@ -167,7 +172,7 @@ function EventsContent() {
           </div>
 
           {/* Filters */}
-          <div className="mb-8 flex flex-col sm:flex-row gap-3">
+          <div className="mb-8 flex flex-col sm:flex-row gap-3 rounded-2xl border border-border/30 bg-surface/60 backdrop-blur-sm p-4">
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="8" strokeWidth="2" /><path strokeLinecap="round" strokeWidth="2" d="m21 21-4.35-4.35" />
@@ -177,7 +182,7 @@ function EventsContent() {
                 placeholder="Search events by name or location..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-border bg-surface pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                className="w-full rounded-xl border border-border/50 bg-background/80 pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all backdrop-blur-sm"
                 aria-label="Search events"
               />
               {search && (
@@ -193,7 +198,7 @@ function EventsContent() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+              className="rounded-xl border border-border/50 bg-background/80 px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all backdrop-blur-sm"
               aria-label="Filter by status"
             >
               {STATUS_OPTIONS.map((o) => (
@@ -203,7 +208,7 @@ function EventsContent() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
-              className="rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+              className="rounded-xl border border-border/50 bg-background/80 px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all backdrop-blur-sm"
               aria-label="Sort by"
             >
               {SORT_OPTIONS.map((o) => (
@@ -259,8 +264,9 @@ function EventsContent() {
                   const minPrice = getMinPrice(event.tiers);
                   return (
                     <motion.div key={event.id} initial="hidden" animate="visible" variants={fadeUp} custom={i}>
+                      <TiltCard glowColor="rgba(108, 99, 255, 0.1)">
                       <Link href={`/events/${event.id}`} className="group block">
-                        <div className="rounded-2xl border border-border bg-surface overflow-hidden hover:border-primary/40 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5">
+                        <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm overflow-hidden hover:border-primary/40 transition-all duration-300 hover:shadow-xl hover:shadow-primary/10">
                           <div className="relative h-48 bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center overflow-hidden">
                             {(event.banner_url || event.bannerUrl) ? (
                               <img src={event.banner_url || event.bannerUrl} alt={event.name || event.title} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -298,6 +304,7 @@ function EventsContent() {
                           </div>
                         </div>
                       </Link>
+                      </TiltCard>
                     </motion.div>
                   );
                 })}
@@ -317,7 +324,7 @@ function EventsContent() {
                   return (
                     <motion.div key={event.id} initial="hidden" animate="visible" variants={fadeUp} custom={i}>
                       <Link href={`/events/${event.id}`} className="group block">
-                        <div className="rounded-xl border border-border bg-surface p-4 sm:p-5 flex gap-4 items-center hover:border-primary/40 transition-all duration-300">
+                        <div className="rounded-xl border border-border/30 bg-surface/80 backdrop-blur-sm p-4 sm:p-5 flex gap-4 items-center hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
                           <div className="shrink-0 h-16 w-16 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary/50">
                               <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="3" y1="10" x2="21" y2="10" />

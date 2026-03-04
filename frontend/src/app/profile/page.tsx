@@ -12,7 +12,7 @@ import { useAuthStore } from '@/lib/store';
 import { usersApi, uploadsApi } from '@/lib/api';
 import { BLOCK_EXPLORER } from '@/lib/constants';
 import { shortenAddress, formatDate } from '@/lib/utils';
-import { useCopyToClipboard } from '@/lib/hooks';
+import { useCopyToClipboard, useRequireAuth } from '@/lib/hooks';
 import { parseError } from '@/lib/error-parser';
 import { toast } from 'sonner';
 import { ImageUpload } from '@/components/ImageUpload';
@@ -21,6 +21,7 @@ import { ImageUpload } from '@/components/ImageUpload';
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 export default function ProfilePage() {
+  useRequireAuth();
   const { user, refreshUser } = useAuthStore();
 
   const [editing, setEditing] = useState(false);
@@ -132,7 +133,11 @@ export default function ProfilePage() {
         <div className="mx-auto max-w-2xl">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-extrabold">My Profile</h1>
+            <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Account</span>
+            <h1 className="mt-2 text-4xl font-extrabold">
+              My{' '}
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Profile</span>
+            </h1>
             <p className="mt-1 text-muted">Manage your account details and preferences</p>
           </div>
 
@@ -164,12 +169,12 @@ export default function ProfilePage() {
 
           {/* Profile Card */}
           <motion.div
-            className="rounded-2xl border border-border bg-surface overflow-hidden"
+            className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm overflow-hidden shadow-xl shadow-primary/5"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
           >
             {/* Banner + Avatar */}
-            <div className="relative h-28 bg-gradient-to-r from-primary/20 via-accent/10 to-primary/5">
+            <div className="relative h-28 bg-gradient-to-r from-primary/25 via-accent/15 to-primary/10">
               <div className="absolute -bottom-10 left-6">
                 {(user.avatar_url || user.avatarUrl) ? (
                   <img
@@ -258,7 +263,7 @@ export default function ProfilePage() {
           <AnimatePresence>
             {editing && (
               <motion.div
-                className="mt-6 rounded-2xl border border-border bg-surface p-6"
+                className="mt-6 rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6"
                 initial={{ opacity: 0, y: 10, height: 0 }}
                 animate={{ opacity: 1, y: 0, height: 'auto' }}
                 exit={{ opacity: 0, y: 10, height: 0 }}
@@ -362,8 +367,8 @@ export default function ProfilePage() {
           {/* Info sections */}
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             {/* Account Info */}
-            <div className="rounded-2xl border border-border bg-surface p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted mb-3">Account</h3>
+            <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-5 hover:border-primary/20 transition-all">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-primary/70 mb-3">Account</h3>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted">User ID</span>
@@ -381,8 +386,8 @@ export default function ProfilePage() {
             </div>
 
             {/* Network Info */}
-            <div className="rounded-2xl border border-border bg-surface p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted mb-3">Network</h3>
+            <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-5 hover:border-accent/20 transition-all">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-accent/70 mb-3">Network</h3>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted">Chain</span>

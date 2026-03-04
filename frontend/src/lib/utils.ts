@@ -1,13 +1,14 @@
 import { formatEther, parseEther } from 'ethers';
-import { format, formatDistanceToNow, isAfter, isBefore, addHours } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 
 export function shortenAddress(address: string, chars = 4): string {
   if (!address) return '';
   return `${address.slice(0, chars + 2)}...${address.slice(-chars)}`;
 }
 
-export function formatPrice(value: string | number, symbol = 'POL'): string {
+export function formatPrice(value: string | number | undefined | null, symbol = 'POL'): string {
   try {
+    if (value === undefined || value === null || value === '') return 'Free';
     const str = String(value);
     // If value looks like wei (large integer, no decimal, > 1e9), convert from wei
     const isWei = /^\d+$/.test(str) && str.length > 9;
@@ -51,47 +52,15 @@ export function formatDateTime(dateString: string): string {
 }
 
 export function formatRelativeTime(dateString: string): string {
-  return formatDistanceToNow(new Date(dateString), { addSuffix: true });
-}
-
-export function hasEventStarted(startTime: string): boolean {
-  return isBefore(new Date(startTime), new Date());
-}
-
-export function isEventSoon(startTime: string): boolean {
-  const start = new Date(startTime);
-  return isAfter(start, new Date()) && isBefore(start, addHours(new Date(), 24));
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return 'N/A';
+  return formatDistanceToNow(d, { addSuffix: true });
 }
 
 export function formatCompact(num: number): string {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
   if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
   return num.toString();
-}
-
-export function statusColor(status: string): string {
-  switch (status) {
-    case 'published':
-    case 'active':
-    case 'minted':
-    case 'approved':
-      return 'text-emerald-400';
-    case 'live':
-      return 'text-blue-400';
-    case 'draft':
-    case 'pending':
-      return 'text-yellow-400';
-    case 'sold':
-    case 'checked_in':
-    case 'completed':
-      return 'text-violet-400';
-    case 'cancelled':
-    case 'rejected':
-    case 'invalidated':
-      return 'text-red-400';
-    default:
-      return 'text-gray-400';
-  }
 }
 
 export function statusBg(status: string): string {

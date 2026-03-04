@@ -13,9 +13,11 @@ import { EmptyState } from '@/components/EmptyState';
 import { ticketsApi } from '@/lib/api';
 import { BLOCK_EXPLORER } from '@/lib/constants';
 import { useAuthStore } from '@/lib/store';
+import { useRequireAuth } from '@/lib/hooks';
 import { formatDate, shortenAddress } from '@/lib/utils';
 import { cn } from '@/lib/cn';
 import { parseError } from '@/lib/error-parser';
+import { TiltCard, SpotlightSection } from '@/components/ui/AnimatedElements';
 import { toast } from 'sonner';
 import type { Ticket, TicketStatus } from '@/lib/types';
 
@@ -48,6 +50,7 @@ function statusColor(status: TicketStatus | string): string {
 }
 
 export default function MyTicketsPage() {
+  useRequireAuth();
   const { user } = useAuthStore();
   const router = useRouter();
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -115,7 +118,11 @@ export default function MyTicketsPage() {
           <div className="mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div>
-                <h1 className="text-3xl font-extrabold">My Tickets</h1>
+                <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Collection</span>
+                <h1 className="mt-2 text-4xl font-extrabold">
+                  My{' '}
+                  <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Tickets</span>
+                </h1>
                 <p className="mt-1 text-muted">
                   {tickets.length > 0
                     ? `${tickets.length} NFT ticket${tickets.length !== 1 ? 's' : ''} in your collection`
@@ -139,8 +146,8 @@ export default function MyTicketsPage() {
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all',
                       filter === f.value
-                        ? 'bg-primary text-white'
-                        : 'bg-surface border border-border text-muted hover:border-primary/30 hover:text-foreground',
+                        ? 'bg-gradient-to-r from-primary to-primary-light text-white shadow-lg shadow-primary/25'
+                        : 'bg-surface/80 border border-border/30 text-muted hover:border-primary/30 hover:text-foreground backdrop-blur-sm',
                     )}
                   >
                     {f.label}
@@ -227,9 +234,10 @@ export default function MyTicketsPage() {
                       key={ticket.id}
                       initial="hidden" animate="visible" variants={fadeUp} custom={i}
                     >
-                      <div className="group rounded-2xl border border-border bg-surface overflow-hidden hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all">
+                      <TiltCard glowColor="rgba(108, 99, 255, 0.1)">
+                      <div className="group rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm overflow-hidden hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all">
                         {/* Ticket header */}
-                        <div className="relative h-32 bg-gradient-to-br from-primary/25 to-accent/10 flex items-center justify-center">
+                        <div className="relative h-32 bg-gradient-to-br from-primary/25 via-accent/10 to-primary/5 flex items-center justify-center">
                           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary/50">
                             <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
                             <path d="M13 5v2" /><path d="M13 17v2" /><path d="M13 11v2" />
@@ -305,6 +313,7 @@ export default function MyTicketsPage() {
                           </div>
                         </div>
                       </div>
+                      </TiltCard>
                     </motion.div>
                   );
                 })}

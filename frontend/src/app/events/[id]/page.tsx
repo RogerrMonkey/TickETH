@@ -18,6 +18,7 @@ import { formatDate, formatDateTime, formatPrice, getTierPrice, getTierPriceWei,
 import { cn } from '@/lib/cn';
 import { useCountdown, useCopyToClipboard } from '@/lib/hooks';
 import { parseError } from '@/lib/error-parser';
+import { SpotlightSection, GlowBorder } from '@/components/ui/AnimatedElements';
 import { toast } from 'sonner';
 import type { TickETHEvent, TicketTier } from '@/lib/types';
 
@@ -39,10 +40,10 @@ function CountdownDisplay({ targetDate }: { targetDate: string }) {
         { value: seconds, label: 'Sec' },
       ].map((unit) => (
         <div key={unit.label} className="text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
-            <span className="text-lg font-bold tabular-nums">{String(unit.value).padStart(2, '0')}</span>
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/20 text-primary shadow-lg shadow-primary/5">
+            <span className="text-xl font-bold tabular-nums">{String(unit.value).padStart(2, '0')}</span>
           </div>
-          <span className="mt-1 text-[10px] text-muted uppercase tracking-wide">{unit.label}</span>
+          <span className="mt-1.5 text-[10px] text-muted uppercase tracking-wider">{unit.label}</span>
         </div>
       ))}
     </div>
@@ -225,7 +226,7 @@ export default function EventDetailPage() {
 
           {/* Hero banner */}
           <motion.div
-            className="relative h-64 sm:h-80 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center overflow-hidden mb-8"
+            className="relative h-64 sm:h-80 rounded-2xl bg-gradient-to-br from-primary/20 via-accent/5 to-primary/10 flex items-center justify-center overflow-hidden mb-8 border border-border/20 shadow-2xl shadow-primary/5"
             initial="hidden" animate="visible" variants={fadeUp}
           >
             {(event.banner_url || event.bannerUrl) ? (
@@ -247,7 +248,9 @@ export default function EventDetailPage() {
             {/* Left — details */}
             <div className="lg:col-span-2 space-y-6">
               <motion.div initial="hidden" animate="visible" variants={fadeUp}>
-                <h1 className="text-3xl font-extrabold">{event.name || event.title}</h1>
+                <h1 className="text-3xl sm:text-4xl font-extrabold">
+                  <span className="bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">{event.name || event.title}</span>
+                </h1>
                 {event.description && (
                   <p className="mt-3 text-muted leading-relaxed">{event.description}</p>
                 )}
@@ -256,7 +259,7 @@ export default function EventDetailPage() {
               {/* Countdown */}
               {showCountdown && (
                 <motion.div
-                  className="rounded-2xl border border-primary/30 bg-primary/5 p-6"
+                  className="rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 p-6 backdrop-blur-sm"
                   initial="hidden" animate="visible" variants={fadeUp}
                 >
                   <p className="text-sm font-medium text-muted mb-3">Event starts in</p>
@@ -266,7 +269,7 @@ export default function EventDetailPage() {
 
               {/* Event details card */}
               <motion.div
-                className="rounded-2xl border border-border bg-surface p-6 space-y-4"
+                className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6 space-y-4"
                 initial="hidden" animate="visible" variants={fadeUp}
               >
                 <h2 className="text-lg font-bold">Event Details</h2>
@@ -344,7 +347,7 @@ export default function EventDetailPage() {
             <div className="space-y-4">
               <h2 className="text-lg font-bold">Ticket Tiers</h2>
               {tiers.length === 0 ? (
-                <div className="rounded-2xl border border-border bg-surface p-6 text-center">
+                <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6 text-center">
                   <p className="text-sm text-muted">No ticket tiers available yet</p>
                 </div>
               ) : (
@@ -358,10 +361,10 @@ export default function EventDetailPage() {
                     <motion.div
                       key={tier.id}
                       className={cn(
-                        'rounded-2xl border p-5 transition-all cursor-pointer',
+                        'rounded-2xl border p-5 transition-all cursor-pointer backdrop-blur-sm',
                         selectedTier?.id === tier.id
-                          ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10'
-                          : 'border-border bg-surface hover:border-primary/30',
+                          ? 'border-primary bg-primary/10 shadow-xl shadow-primary/15'
+                          : 'border-border/30 bg-surface/80 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5',
                         soldOut && 'opacity-50 cursor-not-allowed',
                       )}
                       onClick={() => !soldOut && setSelectedTier(selectedTier?.id === tier.id ? null : tier)}

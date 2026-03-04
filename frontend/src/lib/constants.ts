@@ -22,7 +22,6 @@ export const CHAIN_ID = 80002;
 export const BLOCK_EXPLORER = 'https://amoy.polygonscan.com';
 
 /* ─── App ────────────────────────────────────────────────── */
-export const APP_NAME = 'TickETH';
-export const APP_DESCRIPTION = 'Blockchain NFT Ticketing — Secure. Transparent. Yours.';
+
 export const SIWE_DOMAIN = 'ticketh.io';
 export const SIWE_URI = 'https://ticketh.io';

@@ -13,8 +13,10 @@ import { CardSkeleton } from '@/components/Skeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { eventsApi, organizerRequestsApi } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
+import { useRequireAuth } from '@/lib/hooks';
 import { formatDate, formatCompact } from '@/lib/utils';
 import { parseError } from '@/lib/error-parser';
+import { TiltCard, GlowBorder } from '@/components/ui/AnimatedElements';
 import { toast } from 'sonner';
 import type { TickETHEvent, OrganizerRequest } from '@/lib/types';
 
@@ -28,11 +30,13 @@ const fadeUp = {
 };
 
 export default function OrganizerDashboardPage() {
+  useRequireAuth();
   const { user } = useAuthStore();
   const [events, setEvents] = useState<TickETHEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestStatus, setRequestStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [orgName, setOrgName] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteTitle, setDeleteTitle] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -82,9 +86,13 @@ export default function OrganizerDashboardPage() {
   }, [user, isOrganizer, loadEvents, checkOrganizerRequest]);
 
   const handleRequestRole = async () => {
+    if (!orgName.trim()) {
+      toast.error('Please enter your organization name.');
+      return;
+    }
     setSubmitting(true);
     try {
-      await organizerRequestsApi.submit({ reason: 'I want to organize events on TickETH.' });
+      await organizerRequestsApi.submit({ orgName: orgName.trim() });
       setRequestStatus('pending');
       toast.success('Request submitted successfully!');
     } catch (err) {
@@ -148,7 +156,7 @@ export default function OrganizerDashboardPage() {
         <Navbar />
         <main className="flex-1 flex items-center justify-center px-4">
           <motion.div
-            className="max-w-md w-full rounded-2xl border border-border bg-surface p-8 text-center"
+            className="max-w-md w-full rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-8 text-center shadow-2xl shadow-primary/10"
             initial="hidden" animate="visible" variants={fadeUp} custom={0}
           >
             <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/15">
@@ -159,7 +167,10 @@ export default function OrganizerDashboardPage() {
                 <line x1="22" y1="11" x2="16" y2="11" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold">Become an Organizer</h2>
+            <h2 className="text-xl font-bold">
+              Become an{' '}
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Organizer</span>
+            </h2>
             <p className="mt-2 text-sm text-muted">
               Request organizer access to create and manage events on TickETH.
             </p>
@@ -177,13 +188,23 @@ export default function OrganizerDashboardPage() {
               </div>
             )}
             {(requestStatus === null || requestStatus === 'rejected') && (
-              <Button
-                className="mt-6 w-full"
-                onClick={handleRequestRole}
-                loading={submitting}
-              >
-                Request Organizer Access
-              </Button>
+              <div className="mt-6 space-y-3">
+                <input
+                  type="text"
+                  placeholder="Organization / Brand name"
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-surface-light px-4 py-2.5 text-sm text-white placeholder:text-muted focus:border-primary focus:outline-none"
+                />
+                <Button
+                  className="w-full"
+                  onClick={handleRequestRole}
+                  loading={submitting}
+                  disabled={!orgName.trim()}
+                >
+                  Request Organizer Access
+                </Button>
+              </div>
             )}
           </motion.div>
         </main>
@@ -202,7 +223,10 @@ export default function OrganizerDashboardPage() {
           {/* Header */}
           <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-extrabold">Organizer Dashboard</h1>
+              <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Dashboard</span>
+              <h1 className="mt-2 text-4xl font-extrabold">
+                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Organizer</span>{' '}Dashboard
+              </h1>
               <p className="mt-1 text-muted">Manage your events and track performance</p>
             </div>
             <div className="flex items-center gap-3">
@@ -283,7 +307,7 @@ export default function OrganizerDashboardPage() {
                   initial="hidden" animate="visible" variants={fadeUp} custom={i}
                 >
                   <Link href={`/organizer/${event.id}`} className="group block">
-                    <div className="rounded-2xl border border-border bg-surface overflow-hidden hover:border-primary/30 transition-all">
+                    <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm overflow-hidden hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all">
                       <div className="h-36 bg-gradient-to-br from-primary/15 to-accent/10 flex items-center justify-center relative">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary/40">
                           <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />

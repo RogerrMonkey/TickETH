@@ -11,6 +11,7 @@ import { ImageUpload } from '@/components/ImageUpload';
 import { eventsApi, tiersApi, blockchainApi } from '@/lib/api';
 import { parseEther } from 'ethers';
 import { useAuthStore } from '@/lib/store';
+import { useRequireAuth } from '@/lib/hooks';
 import { parseError } from '@/lib/error-parser';
 import { toast } from 'sonner';
 
@@ -24,6 +25,7 @@ interface TierForm {
 const emptyTier: TierForm = { name: '', description: '', price: '', maxSupply: '' };
 
 export default function CreateEventPage() {
+  useRequireAuth(['organizer', 'admin']);
   const router = useRouter();
   const { user } = useAuthStore();
   const isOrganizer = user?.role === 'organizer' || user?.role === 'admin';
@@ -157,10 +159,10 @@ export default function CreateEventPage() {
             ].map((s, i) => (
               <div key={s.num} className="flex items-center gap-2">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                  className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition-all ${
                     step >= s.num
-                      ? 'bg-primary text-white'
-                      : 'bg-surface-light text-muted border border-border'
+                      ? 'bg-gradient-to-br from-primary to-accent text-white shadow-lg shadow-primary/25'
+                      : 'bg-surface-light text-muted border border-border/30'
                   }`}
                 >
                   {step > s.num ? '✓' : s.num}
@@ -176,8 +178,11 @@ export default function CreateEventPage() {
           {/* Step 1: Event Details & Tiers */}
           {step === 1 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-              <div className="rounded-2xl border border-border bg-surface p-6 space-y-5">
-                <h2 className="text-xl font-bold">Event Details</h2>
+              <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6 space-y-5">
+                <h2 className="text-xl font-bold">
+                  Event{' '}
+                  <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Details</span>
+                </h2>
                 <Input label="Event Title *" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="My Awesome Event" />
                 <Textarea label="Description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell attendees about your event..." rows={4} />
                 <ImageUpload
@@ -198,15 +203,18 @@ export default function CreateEventPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-border bg-surface p-6 space-y-5">
+              <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6 space-y-5">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold">Ticket Tiers</h2>
+                  <h2 className="text-xl font-bold">
+                    Ticket{' '}
+                    <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Tiers</span>
+                  </h2>
                   <Button variant="ghost" size="sm" onClick={addTier} disabled={tiers.length >= 5}>
                     + Add Tier
                   </Button>
                 </div>
                 {tiers.map((tier, i) => (
-                  <div key={i} className="rounded-xl border border-border bg-background p-4 space-y-3">
+                  <div key={i} className="rounded-xl border border-border/30 bg-background/80 p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-muted">Tier {i + 1}</span>
                       {tiers.length > 1 && (
@@ -241,14 +249,17 @@ export default function CreateEventPage() {
           {step === 2 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              className="rounded-2xl border border-border bg-surface p-8 text-center space-y-6"
+              className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-8 text-center space-y-6"
             >
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/15">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-accent/10 shadow-lg shadow-primary/10">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary">
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold">Deploy Smart Contract</h2>
+              <h2 className="text-2xl font-bold">
+                Deploy{' '}
+                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Smart Contract</span>
+              </h2>
               <p className="text-muted max-w-md mx-auto">
                 Deploy your event&apos;s NFT contract to Polygon. This creates the on-chain
                 infrastructure for ticket minting and verification.
@@ -275,9 +286,9 @@ export default function CreateEventPage() {
           {step === 3 && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-              className="rounded-2xl border border-border bg-surface p-8 text-center space-y-6"
+              className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-8 text-center space-y-6"
             >
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/15">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/10 shadow-lg shadow-green-500/10">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-400">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />

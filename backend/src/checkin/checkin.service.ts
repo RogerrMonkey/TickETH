@@ -10,6 +10,7 @@ import Redis from 'ioredis';
 import { SupabaseService } from '../common/supabase/supabase.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { AuditService } from '../audit/audit.service';
+import { CheckinGateway } from './checkin.gateway';
 import { CheckinResult, TicketStatus, AuditAction } from '../common/enums';
 import { ScanTicketDto } from './dto/scan-ticket.dto';
 import { ConfirmCheckinDto } from './dto/confirm-checkin.dto';
@@ -56,6 +57,7 @@ export class CheckinService {
     private readonly supabase: SupabaseService,
     private readonly tickets: TicketsService,
     private readonly audit: AuditService,
+    private readonly gateway: CheckinGateway,
   ) {}
 
   onModuleInit() {
@@ -241,6 +243,9 @@ export class CheckinService {
     };
     await this.storePending(logId, pending);
 
+    // 8. Notify attendee via WebSocket to show confirmation screen
+    this.gateway.emitConfirmationRequest(dto.ticketId, logId);
+
     return {
       checkinLogId: logId,
       result: CheckinResult.PENDING_CONFIRMATION,
@@ -291,6 +296,18 @@ export class CheckinService {
     });
 
     this.logger.log(`Ticket ${pendingItem.ticketId} checked in successfully`);
+
+    // Notify volunteer's scanner via WebSocket
+    this.gateway.emitCheckinResult(pendingItem.eventId, {
+      checkinLogId: dto.checkinLogId,
+      ticketId: pendingItem.ticketId,
+      status: CheckinResult.SUCCESS,
+      message: 'Attendee confirmed — entry granted!',
+    });
+
+    // Broadcast updated attendee count
+    const count = await this.getLiveCount(pendingItem.eventId);
+    this.gateway.emitAttendeeCount(pendingItem.eventId, count);
 
     return {
       result: CheckinResult.SUCCESS,
@@ -397,6 +414,18 @@ export class CheckinService {
 
     if (error) throw error;
     return count ?? 0;
+  }
+
+  /** Get status of a single check-in log (used by volunteer polling) */
+  async getCheckinStatus(checkinLogId: string) {
+    const { data, error } = await this.supabase.admin
+      .from('checkin_logs')
+      .select('id, ticket_id, event_id, result, scanned_at, confirmed_at')
+      .eq('id', checkinLogId)
+      .single();
+
+    if (error || !data) throw new NotFoundException('Check-in log not found');
+    return data;
   }
 
   /* ── HMAC Signing ─────────────────────────────────────────── */

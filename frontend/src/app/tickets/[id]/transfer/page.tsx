@@ -158,26 +158,28 @@ export default function TransferTicketPage() {
           </button>
 
           <motion.div
-            className="rounded-2xl border border-border bg-surface p-6 space-y-6"
+            className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6 space-y-6 shadow-xl shadow-primary/5"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/15">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 shadow-lg shadow-accent/10">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
                   <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
                   <path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
                 </svg>
               </div>
               <div>
-                <h1 className="text-xl font-bold">Transfer Ticket</h1>
+                <h1 className="text-xl font-bold">
+                  <span className="bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">Transfer</span> Ticket
+                </h1>
                 <p className="text-sm text-muted">Send your NFT ticket to another wallet</p>
               </div>
             </div>
 
             {/* Ticket summary */}
-            <div className="rounded-xl bg-surface-light p-4 space-y-2">
+            <div className="rounded-xl bg-surface-light/80 backdrop-blur-sm border border-border/20 p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted">Event</span>
                 <span className="font-medium">{ticket.event?.name || ticket.event?.title || 'Unknown'}</span>

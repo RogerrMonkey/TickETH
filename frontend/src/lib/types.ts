@@ -122,7 +122,22 @@ export interface Listing {
   sellerWallet?: string;
   seller_wallet?: string;
   listingId?: number;
-  price: string;
+  listing_id?: number;
+  price?: string;
+  askingPrice?: number;
+  asking_price?: number;
+  askingPriceWei?: string;
+  asking_price_wei?: string;
+  originalPrice?: number;
+  original_price?: number;
+  originalPriceWei?: string;
+  original_price_wei?: string;
+  contractAddress?: string;
+  contract_address?: string;
+  tokenId?: number;
+  token_id?: number;
+  eventId?: string;
+  event_id?: string;
   status: ListingStatus;
   createdAt?: string;
   created_at?: string;
@@ -185,12 +200,6 @@ export interface PaginatedResponse<T> {
   };
 }
 
-/* ─── API Error ──────────────────────────────────────────── */
-export interface ApiError {
-  statusCode: number;
-  message: string;
-  error?: string;
-}
 
 /* ─── Dashboard Stats ────────────────────────────────────── */
 export interface DashboardStats {

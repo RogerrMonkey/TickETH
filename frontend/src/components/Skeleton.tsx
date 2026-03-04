@@ -57,16 +57,3 @@ export function TableRowSkeleton({ cols = 5 }: { cols?: number }) {
     </tr>
   );
 }
-
-export function StatsSkeleton({ count = 4 }: { count?: number }) {
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4" role="status" aria-label="Loading stats">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-2xl border border-border bg-surface p-5 space-y-2">
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-8 w-3/4" />
-        </div>
-      ))}
-    </div>
-  );
-}

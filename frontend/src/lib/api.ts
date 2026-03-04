@@ -10,8 +10,6 @@ import type {
   OrganizerRequest,
   PaginatedResponse,
   DashboardStats,
-  EventStats,
-  CheckinLog,
 } from './types';
 
 /* ════════════════════════════════════════════════════
@@ -79,17 +77,11 @@ export const eventsApi = {
   create: (body: Record<string, any>) =>
     apiClient.post<TickETHEvent>('/events', body).then((r) => r.data),
 
-  update: (id: string, body: Partial<TickETHEvent>) =>
-    apiClient.patch<TickETHEvent>(`/events/${id}`, body).then((r) => r.data),
-
   publish: (id: string) =>
     apiClient.post<TickETHEvent>(`/events/${id}/publish`).then((r) => r.data),
 
   cancel: (id: string) =>
     apiClient.post<TickETHEvent>(`/events/${id}/cancel`).then((r) => r.data),
-
-  getStats: (id: string) =>
-    apiClient.get<EventStats>(`/events/${id}/stats`).then((r) => r.data),
 
   delete: (id: string) =>
     apiClient.delete<{ success: boolean; message: string }>(`/events/${id}`).then((r) => r.data),
@@ -102,24 +94,9 @@ export const tiersApi = {
   list: (eventId: string) =>
     apiClient.get<TicketTier[]>(`/events/${eventId}/tiers`).then((r) => r.data),
 
-  availability: (eventId: string) =>
-    apiClient
-      .get<TicketTier[]>(`/events/${eventId}/tiers/availability`)
-      .then((r) => r.data),
-
-  create: (eventId: string, body: Omit<TicketTier, 'id' | 'event_id' | 'minted'>) =>
-    apiClient
-      .post<TicketTier>(`/events/${eventId}/tiers`, body)
-      .then((r) => r.data),
-
   batchCreate: (eventId: string, tiers: Record<string, any>[]) =>
     apiClient
       .post<TicketTier[]>(`/events/${eventId}/tiers/batch`, tiers)
-      .then((r) => r.data),
-
-  update: (eventId: string, tierId: string, body: Partial<TicketTier>) =>
-    apiClient
-      .patch<TicketTier>(`/events/${eventId}/tiers/${tierId}`, body)
       .then((r) => r.data),
 };
 
@@ -135,11 +112,6 @@ export const ticketsApi = {
   getById: (id: string) =>
     apiClient.get<Ticket>(`/tickets/${id}`).then((r) => r.data),
 
-  byEvent: (eventId: string, params?: { page?: number; limit?: number }) =>
-    apiClient
-      .get<PaginatedResponse<Ticket>>(`/tickets/event/${eventId}`, { params })
-      .then((r) => r.data),
-
   recordMint: (body: Record<string, any>) =>
     apiClient.post<Ticket>('/tickets/record-mint', body).then((r) => r.data),
 };
@@ -153,15 +125,7 @@ export const marketplaceApi = {
       .get<PaginatedResponse<Listing>>('/marketplace/listings', { params })
       .then((r) => r.data),
 
-  getById: (id: string) =>
-    apiClient.get<Listing>(`/marketplace/listings/${id}`).then((r) => r.data),
-
-  myListings: (params?: { page?: number; limit?: number }) =>
-    apiClient
-      .get<PaginatedResponse<Listing>>('/marketplace/my-listings', { params })
-      .then((r) => r.data),
-
-  create: (body: { ticketId: string; price: string; txHash?: string }) =>
+  create: (body: { ticketId: string; askingPriceWei: string; askingPrice?: number; listingTxHash?: string }) =>
     apiClient.post<Listing>('/marketplace/list', body).then((r) => r.data),
 
   completeSale: (listingId: string, body?: Record<string, any>) =>
@@ -169,12 +133,6 @@ export const marketplaceApi = {
 
   cancel: (listingId: string) =>
     apiClient.post(`/marketplace/cancel/${listingId}`),
-
-  history: (ticketId: string) =>
-    apiClient.get<Listing[]>(`/marketplace/history/${ticketId}`).then((r) => r.data),
-
-  stats: (eventId: string) =>
-    apiClient.get(`/marketplace/stats/${eventId}`).then((r) => r.data),
 };
 
 /* ════════════════════════════════════════════════════
@@ -192,12 +150,7 @@ export const organizerRequestsApi = {
       .get<PaginatedResponse<OrganizerRequest>>('/organizer-requests', { params })
       .then((r) => r.data),
 
-  pending: (params?: { page?: number; limit?: number }) =>
-    apiClient
-      .get<PaginatedResponse<OrganizerRequest>>('/organizer-requests/pending', { params })
-      .then((r) => r.data),
-
-  review: (id: string, body: { status: 'approved' | 'rejected'; feedback?: string }) =>
+  review: (id: string, body: { approved: boolean; rejectionReason?: string }) =>
     apiClient.patch(`/organizer-requests/${id}/review`, body),
 };
 
@@ -227,41 +180,16 @@ export const blockchainApi = {
     const body = typeof eventIdOrBody === 'string' ? { eventId: eventIdOrBody } : eventIdOrBody;
     return apiClient.post('/blockchain/deploy', body).then((r) => r.data);
   },
-
-  verify: (contractAddress: string, tokenId: number, owner?: string) =>
-    apiClient
-      .get(`/blockchain/verify/${contractAddress}/${tokenId}`, {
-        params: owner ? { owner } : undefined,
-      })
-      .then((r) => r.data),
-
-  status: () => apiClient.get('/blockchain/status').then((r) => r.data),
 };
 
 /* ════════════════════════════════════════════════════
-   IPFS
-   ════════════════════════════════════════════════════ */
-export const ipfsApi = {
-  pinMetadata: (body: {
-    name: string;
-    description: string;
-    image?: string;
-    attributes?: Array<{ trait_type: string; value: string | number }>;
-  }) => apiClient.post('/ipfs/pin-metadata', body).then((r) => r.data),
-};
 
-/* ════════════════════════════════════════════════════
    CHECK-IN (Organizer dashboard)
    ════════════════════════════════════════════════════ */
 export const checkinApi = {
   liveCount: (eventId: string) =>
     apiClient
       .get<{ count: number }>(`/checkin/event/${eventId}/count`)
-      .then((r) => r.data),
-
-  logs: (eventId: string, params?: { page?: number; limit?: number }) =>
-    apiClient
-      .get<PaginatedResponse<CheckinLog>>(`/checkin/event/${eventId}/logs`, { params })
       .then((r) => r.data),
 };
 

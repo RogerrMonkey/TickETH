@@ -9,6 +9,7 @@ import { Button } from '@/components/Button';
 import { TableRowSkeleton } from '@/components/Skeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { useAuthStore } from '@/lib/store';
+import { useRequireAuth } from '@/lib/hooks';
 import { organizerRequestsApi } from '@/lib/api';
 import { BLOCK_EXPLORER } from '@/lib/constants';
 import { shortenAddress, formatRelativeTime } from '@/lib/utils';
@@ -17,6 +18,7 @@ import { toast } from 'sonner';
 import type { OrganizerRequest } from '@/lib/types';
 
 export default function AdminRequestsPage() {
+  useRequireAuth(['admin']);
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
 
@@ -42,11 +44,11 @@ export default function AdminRequestsPage() {
     if (isAdmin) loadRequests();
   }, [isAdmin, loadRequests]);
 
-  const handleReview = async (requestId: string, status: 'approved' | 'rejected') => {
+  const handleReview = async (requestId: string, decision: 'approved' | 'rejected') => {
     setProcessing(requestId);
     try {
-      await organizerRequestsApi.review(requestId, { status });
-      toast.success(`Request ${status}`);
+      await organizerRequestsApi.review(requestId, { approved: decision === 'approved' });
+      toast.success(`Request ${decision}`);
       loadRequests();
     } catch (err) {
       toast.error(parseError(err).message);
@@ -91,7 +93,11 @@ export default function AdminRequestsPage() {
               </svg>
               Back to Admin
             </button>
-            <h1 className="text-3xl font-extrabold">Organizer Requests</h1>
+            <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Review</span>
+            <h1 className="mt-2 text-4xl font-extrabold">
+              Organizer{' '}
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Requests</span>
+            </h1>
             <p className="mt-1 text-muted">
               {requests.filter((r) => r.status === 'pending').length} pending review
             </p>
@@ -105,10 +111,10 @@ export default function AdminRequestsPage() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
                   filter === f
-                    ? 'bg-primary text-white'
-                    : 'bg-surface border border-border text-muted hover:text-foreground'
+                    ? 'bg-gradient-to-r from-primary to-primary-light text-white shadow-lg shadow-primary/25'
+                    : 'bg-surface/80 border border-border/30 text-muted hover:text-foreground backdrop-blur-sm'
                 }`}
               >
                 {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -148,7 +154,7 @@ export default function AdminRequestsPage() {
               {filtered.map((req) => (
                 <motion.div
                   key={req.id}
-                  className="rounded-2xl border border-border bg-surface p-6"
+                  className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm p-6 hover:border-primary/20 transition-all"
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -168,7 +174,7 @@ export default function AdminRequestsPage() {
                         <p className="text-sm text-muted">&ldquo;{req.reason}&rdquo;</p>
                       )}
                       <p className="text-xs text-muted mt-2">
-                        Submitted {formatRelativeTime(req.createdAt)}
+                        Submitted {formatRelativeTime(req.submitted_at ?? req.createdAt)}
                       </p>
                     </div>
 

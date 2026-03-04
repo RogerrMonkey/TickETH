@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThirdwebProvider } from 'thirdweb/react-native';
 import { AuthProvider } from '../src/providers/AuthProvider';
 import { WalletProvider } from '../src/providers/WalletProvider';
+import { CheckinProvider } from '../src/providers/CheckinProvider';
 import { ToastProvider } from '../src/services/toast';
 import { Colors } from '../src/constants/theme';
 
@@ -29,7 +30,8 @@ export default function RootLayout() {
         <ThirdwebProvider>
           <AuthProvider>
             <WalletProvider>
-              <ToastProvider>
+              <CheckinProvider>
+                <ToastProvider>
                 <StatusBar style="light" />
                 <Stack
                   screenOptions={{
@@ -75,6 +77,7 @@ export default function RootLayout() {
                   />
                 </Stack>
               </ToastProvider>
+              </CheckinProvider>
             </WalletProvider>
           </AuthProvider>
         </ThirdwebProvider>

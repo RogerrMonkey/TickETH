@@ -107,18 +107,18 @@ export function Navbar() {
   }[user.role] : null;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border/30 bg-background/70 backdrop-blur-2xl">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/20 text-primary transition-colors group-hover:bg-primary/30">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-accent/10 text-primary transition-all group-hover:from-primary/35 group-hover:to-accent/20 group-hover:shadow-lg group-hover:shadow-primary/20">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
               <path d="M13 5v2" /><path d="M13 17v2" /><path d="M13 11v2" />
             </svg>
           </div>
           <span className="text-lg font-bold tracking-tight">
-            Tick<span className="text-primary">ETH</span>
+            Tick<span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">ETH</span>
           </span>
         </Link>
 
