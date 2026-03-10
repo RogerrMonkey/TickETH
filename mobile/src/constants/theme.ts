@@ -1,60 +1,75 @@
 /**
- * TickETH Design System
- * Dark-first theme with vibrant accent colors
+ * TickETH Design System v2.0
+ * Premium dark theme with glass-morphism, vibrant gradients & refined spacing
  */
 
 export const Colors = {
-  // Primary brand
-  primary: '#6C63FF',
-  primaryLight: '#8B83FF',
-  primaryDark: '#4F46E5',
+  // Primary brand — Electric indigo
+  primary: '#7B6EF6',
+  primaryLight: '#9D93FF',
+  primaryDark: '#5B4FD6',
+  primaryMuted: 'rgba(123, 110, 246, 0.12)',
 
-  // Accent
-  accent: '#00D9FF',
-  accentLight: '#67E8F9',
+  // Accent — Cyan glow
+  accent: '#00E5FF',
+  accentLight: '#67F0FF',
+  accentMuted: 'rgba(0, 229, 255, 0.12)',
 
   // Success / Error / Warning
-  success: '#10B981',
-  successLight: '#34D399',
-  error: '#EF4444',
-  errorLight: '#F87171',
-  warning: '#F59E0B',
-  warningLight: '#FBBF24',
+  success: '#00D68F',
+  successLight: '#33E5AB',
+  successMuted: 'rgba(0, 214, 143, 0.12)',
+  error: '#FF4D6A',
+  errorLight: '#FF7A90',
+  errorMuted: 'rgba(255, 77, 106, 0.12)',
+  warning: '#FFB800',
+  warningLight: '#FFCB45',
+  warningMuted: 'rgba(255, 184, 0, 0.12)',
 
-  // Backgrounds (dark theme)
-  background: '#0D0D0D',
-  surface: '#1A1A2E',
-  surfaceLight: '#242442',
-  surfaceHighlight: '#2D2D50',
+  // Backgrounds (premium dark)
+  background: '#08080F',
+  surface: '#12121F',
+  surfaceLight: '#1C1C30',
+  surfaceHighlight: '#262645',
+
+  // Glass surfaces
+  glass: 'rgba(255, 255, 255, 0.04)',
+  glassBorder: 'rgba(255, 255, 255, 0.08)',
+  glassLight: 'rgba(255, 255, 255, 0.07)',
 
   // Text
-  textPrimary: '#FFFFFF',
-  textSecondary: '#A0A0B8',
-  textMuted: '#6B6B80',
-  textInverse: '#0D0D0D',
+  textPrimary: '#F5F5FF',
+  textSecondary: '#9B9BB8',
+  textMuted: '#5E5E78',
+  textInverse: '#08080F',
 
   // Borders
-  border: '#2D2D50',
-  borderLight: '#3D3D60',
+  border: 'rgba(255, 255, 255, 0.06)',
+  borderLight: 'rgba(255, 255, 255, 0.10)',
+  borderActive: 'rgba(123, 110, 246, 0.4)',
 
   // Overlays
-  overlay: 'rgba(0, 0, 0, 0.6)',
-  overlayLight: 'rgba(0, 0, 0, 0.3)',
+  overlay: 'rgba(8, 8, 15, 0.75)',
+  overlayLight: 'rgba(8, 8, 15, 0.45)',
 
   // Gradients (use with LinearGradient)
-  gradientPrimary: ['#6C63FF', '#4F46E5'] as const,
-  gradientAccent: ['#00D9FF', '#6C63FF'] as const,
-  gradientDark: ['#1A1A2E', '#0D0D0D'] as const,
+  gradientPrimary: ['#7B6EF6', '#5B4FD6'] as const,
+  gradientAccent: ['#00E5FF', '#7B6EF6'] as const,
+  gradientDark: ['#12121F', '#08080F'] as const,
+  gradientCard: ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.02)'] as const,
+  gradientHero: ['#7B6EF6', '#00E5FF'] as const,
+  gradientSunset: ['#FF4D6A', '#FFB800'] as const,
 
   // Ticket status colors
-  ticketActive: '#10B981',
-  ticketUsed: '#6B6B80',
-  ticketTransferred: '#F59E0B',
-  ticketListed: '#00D9FF',
+  ticketActive: '#00D68F',
+  ticketUsed: '#5E5E78',
+  ticketTransferred: '#FFB800',
+  ticketListed: '#00E5FF',
 } as const;
 
 export const Typography = {
   sizes: {
+    '2xs': 10,
     xs: 11,
     sm: 13,
     md: 15,
@@ -63,7 +78,7 @@ export const Typography = {
     '2xl': 24,
     '3xl': 30,
     '4xl': 36,
-    hero: 48,
+    hero: 42,
   },
   weights: {
     regular: '400' as const,
@@ -73,13 +88,18 @@ export const Typography = {
     extrabold: '800' as const,
   },
   families: {
-    // System fonts — no custom font loading needed
     sans: undefined, // Uses system default
     mono: 'monospace' as const,
+  },
+  lineHeights: {
+    tight: 1.1,
+    normal: 1.4,
+    relaxed: 1.6,
   },
 } as const;
 
 export const Spacing = {
+  '2xs': 2,
   xs: 4,
   sm: 8,
   md: 12,
@@ -93,48 +113,64 @@ export const Spacing = {
 } as const;
 
 export const BorderRadius = {
-  sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 20,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  '2xl': 32,
   full: 9999,
 } as const;
 
 export const Shadows = {
   sm: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
     elevation: 2,
   },
   md: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
   },
   lg: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
   },
   glow: {
-    shadowColor: '#6C63FF',
+    shadowColor: '#7B6EF6',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  glowAccent: {
+    shadowColor: '#00E5FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
+  },
+  card: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
   },
 } as const;
 
 export const Layout = {
-  screenPadding: Spacing.lg,
+  screenPadding: Spacing.xl,
   cardPadding: Spacing.lg,
   maxContentWidth: 480,
-  tabBarHeight: 80,
+  tabBarHeight: 72,
   headerHeight: 56,
 } as const;

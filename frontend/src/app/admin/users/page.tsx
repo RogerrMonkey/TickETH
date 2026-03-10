@@ -16,6 +16,7 @@ import { shortenAddress, formatDate } from '@/lib/utils';
 import { parseError } from '@/lib/error-parser';
 import { toast } from 'sonner';
 import type { User, UserRole } from '@/lib/types';
+import { PageHeader } from '@/components/PageHeader';
 
 export default function AdminUsersPage() {
   useRequireAuth(['admin']);
@@ -112,7 +113,7 @@ export default function AdminUsersPage() {
       <main className="flex-1 px-4 py-10">
         <div className="mx-auto max-w-6xl">
           {/* Header */}
-          <div className="mb-8">
+          <div>
             <button
               onClick={() => history.back()}
               className="mb-4 inline-flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
@@ -122,12 +123,7 @@ export default function AdminUsersPage() {
               </svg>
               Back to Admin
             </button>
-            <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Manage</span>
-            <h1 className="mt-2 text-4xl font-extrabold">
-              User{' '}
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Management</span>
-            </h1>
-            <p className="mt-1 text-muted">{users.length} total users</p>
+            <PageHeader category="Manage" title="User" highlight="Management" description={`${users.length} total users`} />
           </div>
 
           {/* Alerts */}

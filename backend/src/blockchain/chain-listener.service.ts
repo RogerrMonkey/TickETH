@@ -48,10 +48,10 @@ export class ChainListenerService implements OnModuleInit, OnModuleDestroy {
   private lastProcessedBlock = 0;
   private enabled = false;
 
-  // Polling interval in ms (default 15s — roughly 1 Polygon block)
   private readonly POLL_MS = 15_000;
-  // Max blocks to scan per poll (avoid RPC rate-limits)
   private readonly MAX_BLOCKS_PER_POLL = 100;
+  private consecutiveErrors = 0;
+  private static readonly MAX_BACKOFF_MS = 120_000; // 2 minutes max
 
   constructor(
     private readonly config: ConfigService,
@@ -149,18 +149,31 @@ export class ChainListenerService implements OnModuleInit, OnModuleDestroy {
   private startPolling() {
     if (this.pollInterval) return;
 
-    this.pollInterval = setInterval(async () => {
-      try {
-        await this.poll();
-      } catch (err) {
-        this.logger.error(`Poll error: ${(err as Error).message}`);
-      }
-    }, this.POLL_MS);
+    const scheduleNext = () => {
+      const backoffMs = this.consecutiveErrors > 0
+        ? Math.min(this.POLL_MS * 2 ** this.consecutiveErrors, ChainListenerService.MAX_BACKOFF_MS)
+        : this.POLL_MS;
+
+      this.pollInterval = setTimeout(async () => {
+        try {
+          await this.poll();
+          this.consecutiveErrors = 0;
+        } catch (err) {
+          this.consecutiveErrors++;
+          this.logger.error(
+            `Poll error (attempt ${this.consecutiveErrors}, next in ${Math.min(this.POLL_MS * 2 ** this.consecutiveErrors, ChainListenerService.MAX_BACKOFF_MS)}ms): ${(err as Error).message}`,
+          );
+        }
+        scheduleNext();
+      }, backoffMs);
+    };
+
+    scheduleNext();
   }
 
   private stopPolling() {
     if (this.pollInterval) {
-      clearInterval(this.pollInterval);
+      clearTimeout(this.pollInterval);
       this.pollInterval = null;
       this.logger.log('Chain listener polling stopped');
     }

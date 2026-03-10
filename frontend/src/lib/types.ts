@@ -77,6 +77,10 @@ export interface TicketTier {
   mintedCount?: number;
   resaleAllowed?: boolean;
   resale_allowed?: boolean;
+  max_resales?: number;
+  maxResales?: number;
+  max_price_deviation_bps?: number;
+  maxPriceDeviationBps?: number;
   metadataUri?: string;
   description?: string;
   tier_index?: number;
@@ -107,6 +111,10 @@ export interface Ticket {
   txHash?: string;
   tx_hash?: string;
   metadataUri?: string;
+  transferCount?: number;
+  transfer_count?: number;
+  originalPriceWei?: string;
+  original_price_wei?: string;
   event?: TickETHEvent;
   tier?: TicketTier;
 }

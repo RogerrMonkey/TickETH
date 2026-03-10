@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,11 @@ import {
   Linking,
   Alert,
   TouchableOpacity,
-  Animated,
   Modal,
   RefreshControl,
 } from 'react-native';
+import ReAnimated from 'react-native-reanimated';
+import { useFadeIn, useSlideIn, useScalePress } from '../../src/utils/animations';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -217,25 +218,13 @@ export default function EventDetailScreen() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Animated values
-  const contentFade = useRef(new Animated.Value(0)).current;
-  const tierScales = useRef<Record<string, Animated.Value>>({}).current;
+  // Animated entrance for content
+  const contentStyle = useFadeIn(loading || !event ? 99999 : 0);
 
   // Analytics: screen view
   useEffect(() => {
     if (id) analytics.screenView('event_detail', { event_id: id });
   }, [id]);
-
-  // Fade-in content when loaded
-  useEffect(() => {
-    if (!loading && event) {
-      Animated.timing(contentFade, {
-        toValue: 1,
-        duration: 350,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [loading, event, contentFade]);
 
   // Pull-to-refresh handler
   const onRefresh = useCallback(async () => {
@@ -244,21 +233,8 @@ export default function EventDetailScreen() {
     setRefreshing(false);
   }, [refresh]);
 
-  // Tier scale helper
-  const getTierScale = (tierId: string) => {
-    if (!tierScales[tierId]) {
-      tierScales[tierId] = new Animated.Value(1);
-    }
-    return tierScales[tierId];
-  };
-
   const handleTierSelect = (tier: TicketTier, isSelected: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const scale = getTierScale(tier.id);
-    Animated.sequence([
-      Animated.timing(scale, { toValue: 0.95, duration: 80, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, friction: 4, useNativeDriver: true }),
-    ]).start();
     setSelectedTier(isSelected ? null : tier);
   };
 
@@ -266,7 +242,7 @@ export default function EventDetailScreen() {
     if (!selectedTier) return;
     Alert.alert(
       'Mint Ticket',
-      `Mint a "${selectedTier.name}" ticket for ${formatPrice(selectedTier.price)}?\n\nThis will create an NFT on the Polygon network.`,
+      `Mint a "${selectedTier.name}" ticket for ${formatPrice(selectedTier.price_wei)}?\n\nThis will create an NFT on the Polygon network.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Confirm Mint', onPress: executeMint },
@@ -294,13 +270,18 @@ export default function EventDetailScreen() {
 
     try {
       setMintStep('awaiting_signature');
-      const tierIndex = event.tiers!.findIndex((t) => t.id === selectedTier.id);
+      const tierIndex = selectedTier.tier_index ?? event.tiers!.findIndex((t) => t.id === selectedTier.id);
 
       setMintStep('confirming');
+      // Use price_wei (exact wei string) for on-chain value; fall back to parseEther if missing
+      const priceWei = selectedTier.price_wei && selectedTier.price_wei !== '0'
+        ? selectedTier.price_wei
+        : (() => { const { ethers } = require('ethers'); return ethers.parseEther(selectedTier.price).toString(); })();
+
       const { txHash, tokenId } = await mintTicketOnChain({
         contractAddress: event.contract_address,
         tierIndex,
-        price: selectedTier.price,
+        price: priceWei,
         account: activeAccount,
       });
 
@@ -308,6 +289,7 @@ export default function EventDetailScreen() {
       await ticketsApi.recordMint({
         eventId: event.id,
         tierId: selectedTier.id,
+        contractAddress: event.contract_address,
         tokenId,
         txHash,
         ownerWallet: activeAccount.address,
@@ -446,7 +428,7 @@ export default function EventDetailScreen() {
         </View>
 
         {/* Content with fade-in */}
-        <Animated.View style={[styles.content, { opacity: contentFade }]}>
+        <ReAnimated.View style={[styles.content, contentStyle]}>
           {/* Status & timing */}
           <View style={styles.badges}>
             <Badge label={status.label} variant={status.variant} size="md" />
@@ -482,12 +464,11 @@ export default function EventDetailScreen() {
           {event.tiers && event.tiers.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Select Ticket Tier</Text>
-              {event.tiers.map((tier) => {
-                const soldOut = tier.minted >= tier.supply;
+              {event.tiers.map((tier, index) => {
+                const soldOut = tier.minted >= tier.max_supply;
                 const isSelected = selectedTier?.id === tier.id;
-                const scale = getTierScale(tier.id);
                 return (
-                  <Animated.View key={tier.id} style={{ transform: [{ scale }] }}>
+                  <AnimatedTierCard key={tier.id} index={index}>
                     <TouchableOpacity
                       style={[
                         styles.tierCard,
@@ -497,7 +478,7 @@ export default function EventDetailScreen() {
                       onPress={() => !soldOut && handleTierSelect(tier, isSelected)}
                       activeOpacity={soldOut ? 1 : 0.7}
                       disabled={soldOut}
-                      accessibilityLabel={`${tier.name} tier, ${formatPrice(tier.price)}${soldOut ? ', sold out' : ''}`}
+                      accessibilityLabel={`${tier.name} tier, ${formatPrice(tier.price_wei)}${soldOut ? ', sold out' : ''}`}
                       accessibilityRole="button"
                       accessibilityState={{ selected: isSelected, disabled: soldOut }}
                     >
@@ -517,12 +498,12 @@ export default function EventDetailScreen() {
                           <Text style={styles.tierName}>{tier.name}</Text>
                         </View>
                         <Text style={[styles.tierPrice, soldOut && { color: Colors.textMuted }]}>
-                          {formatPrice(tier.price)}
+                          {formatPrice(tier.price_wei)}
                         </Text>
                       </View>
                       <View style={styles.tierMeta}>
                         <Text style={styles.tierSupply}>
-                          {soldOut ? 'Sold Out' : `${tier.supply - tier.minted} remaining`}
+                          {soldOut ? 'Sold Out' : `${tier.max_supply - tier.minted} remaining`}
                         </Text>
                         {tier.resale_allowed && <Badge label="Resale OK" variant="info" />}
                       </View>
@@ -533,7 +514,7 @@ export default function EventDetailScreen() {
                             styles.tierProgressFill,
                             {
                               width: `${Math.min(
-                                (tier.minted / Math.max(tier.supply, 1)) * 100,
+                                (tier.minted / Math.max(tier.max_supply, 1)) * 100,
                                 100,
                               )}%`,
                             },
@@ -541,7 +522,7 @@ export default function EventDetailScreen() {
                         />
                       </View>
                     </TouchableOpacity>
-                  </Animated.View>
+                  </AnimatedTierCard>
                 );
               })}
             </View>
@@ -570,7 +551,7 @@ export default function EventDetailScreen() {
                   <View style={styles.mintSummary}>
                     <Text style={styles.mintSummaryLabel}>Selected</Text>
                     <Text style={styles.mintSummaryValue}>{selectedTier.name}</Text>
-                    <Text style={styles.mintSummaryPrice}>{formatPrice(selectedTier.price)}</Text>
+                    <Text style={styles.mintSummaryPrice}>{formatPrice(selectedTier.price_wei)}</Text>
                   </View>
                   <Button
                     title={minting ? 'Minting...' : 'Mint NFT Ticket'}
@@ -587,7 +568,7 @@ export default function EventDetailScreen() {
               )}
             </View>
           )}
-        </Animated.View>
+        </ReAnimated.View>
       </ScrollView>
 
       {/* Mint progress modal */}
@@ -605,6 +586,19 @@ export default function EventDetailScreen() {
         }}
       />
     </SafeAreaView>
+  );
+}
+
+/* ─── Animated Tier Card ────────────────────────────────── */
+
+function AnimatedTierCard({ index, children }: { index: number; children: React.ReactNode }) {
+  const entranceStyle = useSlideIn('up', 100 + index * 80, 20);
+  const { animatedStyle, onPressIn, onPressOut } = useScalePress(0.97);
+
+  return (
+    <ReAnimated.View style={[entranceStyle, animatedStyle]}>
+      {children}
+    </ReAnimated.View>
   );
 }
 
@@ -652,7 +646,7 @@ const styles = StyleSheet.create({
   },
   banner: {
     width: '100%',
-    height: 240,
+    height: 260,
   },
   bannerPlaceholder: {
     backgroundColor: Colors.surface,
@@ -661,17 +655,19 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: Spacing.lg,
-    left: Spacing.md,
+    top: Spacing.xl,
+    left: Spacing.lg,
   },
   backButtonInner: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: BorderRadius.full,
+    backgroundColor: 'rgba(8, 8, 15, 0.6)',
+    borderRadius: 20,
     width: 40,
     height: 40,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   content: {
-    padding: Spacing.lg,
+    padding: Spacing.xl,
   },
   badges: {
     flexDirection: 'row',
@@ -683,9 +679,11 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes['2xl'],
     fontWeight: Typography.weights.extrabold,
     marginBottom: Spacing.xl,
+    letterSpacing: -0.5,
+    lineHeight: 32,
   },
   detailsGrid: {
-    gap: Spacing.md,
+    gap: Spacing.lg,
     marginBottom: Spacing.xl,
   },
   detailItem: {
@@ -694,16 +692,19 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   detailIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: Colors.surface,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   detailLabel: {
     color: Colors.textMuted,
     fontSize: Typography.sizes.xs,
+    letterSpacing: 0.3,
   },
   detailValue: {
     color: Colors.textPrimary,
@@ -712,17 +713,16 @@ const styles = StyleSheet.create({
   },
   detailLink: {
     color: Colors.accent,
-    textDecorationLine: 'underline',
   },
   section: {
     marginBottom: Spacing.xl,
   },
   sectionTitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
+    color: Colors.textMuted,
+    fontSize: Typography.sizes['2xs'],
+    fontWeight: Typography.weights.bold,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     marginBottom: Spacing.md,
   },
   description: {
@@ -735,9 +735,9 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.md,
-    ...Shadows.sm,
+    ...Shadows.card,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: Colors.border,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -750,7 +750,7 @@ const styles = StyleSheet.create({
   },
   soldOutOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(13,13,13,0.6)',
+    backgroundColor: 'rgba(8,8,15,0.7)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -762,7 +762,7 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.bold,
     marginTop: 4,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   tierHeader: {
     flexDirection: 'row',
@@ -779,11 +779,12 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
+    letterSpacing: -0.2,
   },
   tierPrice: {
     color: Colors.primary,
     fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
+    fontWeight: Typography.weights.extrabold,
   },
   tierMeta: {
     flexDirection: 'row',
@@ -799,9 +800,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: Typography.sizes.sm,
     marginBottom: Spacing.sm,
+    lineHeight: 20,
   },
   tierProgress: {
-    height: 4,
+    height: 3,
     backgroundColor: Colors.surfaceLight,
     borderRadius: 2,
     overflow: 'hidden',
@@ -815,13 +817,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.lg,
+    gap: Spacing.xl,
   },
   errorText: {
     color: Colors.error,
     fontSize: Typography.sizes.md,
     textAlign: 'center',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   mintSection: {
     marginTop: Spacing.xl,
@@ -836,6 +838,8 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
     gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   mintSummaryLabel: {
     color: Colors.textMuted,
@@ -858,6 +862,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: Spacing.xl,
   },
+  deleteSection: {
+    marginTop: Spacing.xl,
+    paddingTop: Spacing.xl,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  deleteButton: {
+    borderColor: Colors.error,
+  },
 });
 
 /* ─── Overlay Styles ────────────────────────────────────── */
@@ -865,29 +878,32 @@ const styles = StyleSheet.create({
 const overlayStyles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(8,8,15,0.85)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: Spacing.lg,
+    padding: Spacing.xl,
   },
   card: {
     width: '100%',
     maxWidth: 360,
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
+    padding: Spacing['2xl'],
     ...Shadows.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   title: {
     color: Colors.textPrimary,
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
     textAlign: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
+    letterSpacing: -0.3,
   },
   steps: {
     gap: Spacing.md,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   stepRow: {
     flexDirection: 'row',
@@ -895,21 +911,26 @@ const overlayStyles = StyleSheet.create({
     gap: Spacing.md,
   },
   stepDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: Colors.surfaceLight,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   stepDotDone: {
     backgroundColor: Colors.success,
+    borderColor: Colors.success,
   },
   stepDotActive: {
     backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   stepDotError: {
     backgroundColor: Colors.error,
+    borderColor: Colors.error,
   },
   stepLabel: {
     color: Colors.textMuted,
@@ -928,20 +949,23 @@ const overlayStyles = StyleSheet.create({
   errorBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing.sm,
-    backgroundColor: 'rgba(239,68,68,0.1)',
-    padding: Spacing.md,
+    gap: Spacing.md,
+    backgroundColor: Colors.errorMuted,
+    padding: Spacing.lg,
     borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255,77,106,0.15)',
   },
   errorText: {
     color: Colors.error,
     fontSize: Typography.sizes.sm,
     flex: 1,
+    lineHeight: 20,
   },
   successActions: {
     alignItems: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   txLabel: {
     color: Colors.textMuted,
@@ -958,18 +982,20 @@ const overlayStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   actionBtnText: {
     color: Colors.accent,
     fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
+    fontWeight: Typography.weights.bold,
   },
   deleteSection: {
-    marginTop: Spacing.lg,
-    paddingTop: Spacing.lg,
+    marginTop: Spacing.xl,
+    paddingTop: Spacing.xl,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },

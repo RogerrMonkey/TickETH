@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,13 @@ import {
   Alert,
   TouchableOpacity,
   TextInput,
-  Animated,
   Vibration,
 } from 'react-native';
+import ReAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -16,7 +20,6 @@ import { Colors, Typography, Spacing, BorderRadius } from '../../src/constants/t
 import { QRScanner } from '../../src/components/QRScanner';
 import { ScanResultDisplay } from '../../src/components/ScanResult';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
-import { Badge } from '../../src/components/ui/Badge';
 import { Button } from '../../src/components/ui/Button';
 import { useScanCheckin } from '../../src/hooks/useCheckin';
 import { useOfflineStore } from '../../src/stores/offlineStore';
@@ -34,7 +37,8 @@ export default function ScannerScreen() {
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [scanCount, setScanCount] = useState(0);
-  const flashAnim = useRef(new Animated.Value(0)).current;
+  const flashOpacity = useSharedValue(0);
+  const [flashColor, setFlashColor] = useState<string>(Colors.success);
 
   useEffect(() => {
     analytics.screenView('scanner');
@@ -43,14 +47,11 @@ export default function ScannerScreen() {
   // Flash animation for scan result
   const flashScreen = useCallback(
     (success: boolean) => {
-      flashAnim.setValue(1);
-      Animated.timing(flashAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
+      setFlashColor(success ? Colors.success : Colors.error);
+      flashOpacity.value = 1;
+      flashOpacity.value = withTiming(0, { duration: 500 });
     },
-    [flashAnim],
+    [flashOpacity],
   );
 
   // Enhanced scan handler with haptics + sound effects
@@ -133,21 +134,7 @@ export default function ScannerScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Flash overlay for scan feedback */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            backgroundColor: scanResult
-              ? scanResult.result === 'success' || scanResult.result === 'pending_confirmation'
-                ? Colors.success
-                : Colors.error
-              : 'transparent',
-            opacity: flashAnim,
-            zIndex: 100,
-          },
-        ]}
-      />
+      <FlashOverlay opacity={flashOpacity} color={flashColor} />
 
       {/* Header bar */}
       <View style={styles.header}>
@@ -171,16 +158,19 @@ export default function ScannerScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handlePrepareOffline}
-            style={styles.headerButton}
+            style={[
+              styles.statusPill,
+              { backgroundColor: isOnline ? Colors.successMuted : Colors.warningMuted,
+                borderColor: isOnline ? 'rgba(0,214,143,0.25)' : 'rgba(255,184,0,0.25)' },
+            ]}
             accessibilityLabel={isOnline ? 'Online, prepare offline data' : 'Offline mode'}
             accessibilityRole="button"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Badge
-              label={isOnline ? 'Online' : 'Offline'}
-              variant={isOnline ? 'success' : 'warning'}
-              size="md"
-            />
+            <View style={[styles.statusDot, { backgroundColor: isOnline ? Colors.success : Colors.warning }]} />
+            <Text style={[styles.statusLabel, { color: isOnline ? Colors.success : Colors.warning }]}>
+              {isOnline ? 'Online' : 'Offline'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -259,6 +249,26 @@ export default function ScannerScreen() {
   );
 }
 
+import type { SharedValue } from 'react-native-reanimated';
+
+/** Flash overlay driven by Reanimated shared value */
+function FlashOverlay({ opacity, color }: { opacity: SharedValue<number>; color: string }) {
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return (
+    <ReAnimated.View
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFill,
+        { backgroundColor: color, zIndex: 100 },
+        animatedStyle,
+      ]}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -292,6 +302,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: BorderRadius.md,
     backgroundColor: Colors.surface,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusLabel: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.bold,
   },
   manualInputBar: {
     flexDirection: 'row',

@@ -28,6 +28,8 @@ export class IpfsService implements OnModuleInit {
   private jwt!: string;
   private gateway!: string;
   private readonly PINATA_API = 'https://api.pinata.cloud';
+  private static readonly FETCH_TIMEOUT_MS = 30_000;
+  private static readonly MAX_RETRIES = 3;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -76,21 +78,15 @@ export class IpfsService implements OnModuleInit {
       pinataOptions: { cidVersion: 1 },
     };
 
-    const res = await fetch(`${this.PINATA_API}/pinning/pinJSONToIPFS`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.authHeaders(),
+    const data = await this.fetchWithRetry<{ IpfsHash: string }>(
+      `${this.PINATA_API}/pinning/pinJSONToIPFS`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Pinata pinJSON failed (${res.status}): ${text}`);
-    }
-
-    const data = (await res.json()) as { IpfsHash: string };
+      'pinJSON',
+    );
     return this.buildResult(data.IpfsHash);
   }
 
@@ -115,18 +111,11 @@ export class IpfsService implements OnModuleInit {
       JSON.stringify({ cidVersion: 1 }),
     );
 
-    const res = await fetch(`${this.PINATA_API}/pinning/pinFileToIPFS`, {
-      method: 'POST',
-      headers: { ...this.authHeaders() },
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Pinata pinFile failed (${res.status}): ${text}`);
-    }
-
-    const data = (await res.json()) as { IpfsHash: string };
+    const data = await this.fetchWithRetry<{ IpfsHash: string }>(
+      `${this.PINATA_API}/pinning/pinFileToIPFS`,
+      { method: 'POST', headers: { ...this.authHeaders() }, body: formData },
+      'pinFile',
+    );
     return this.buildResult(data.IpfsHash);
   }
 
@@ -147,38 +136,21 @@ export class IpfsService implements OnModuleInit {
     organizerAddress?: string;
     contractAddress?: string;
   }): Promise<IpfsUploadResult> {
+    const optionalAttrs: Array<{ trait_type: string; value?: string | number; display_type?: string }> = [
+      { trait_type: 'Event Date', value: params.eventDate },
+      { trait_type: 'Venue', value: params.venue },
+      { trait_type: 'City', value: params.city },
+      { trait_type: 'Price', value: params.ticketPrice },
+      { trait_type: 'Tier Index', value: params.tierIndex, display_type: 'number' },
+      { trait_type: 'Max Supply', value: params.maxSupply, display_type: 'number' },
+    ];
+
     const attributes: NftMetadata['attributes'] = [
       { trait_type: 'Event', value: params.eventName },
       { trait_type: 'Tier', value: params.tierName },
       { trait_type: 'Token ID', value: params.tokenId, display_type: 'number' },
+      ...optionalAttrs.filter((a) => a.value !== undefined && a.value !== null) as NftMetadata['attributes'],
     ];
-
-    if (params.eventDate) {
-      attributes.push({ trait_type: 'Event Date', value: params.eventDate });
-    }
-    if (params.venue) {
-      attributes.push({ trait_type: 'Venue', value: params.venue });
-    }
-    if (params.city) {
-      attributes.push({ trait_type: 'City', value: params.city });
-    }
-    if (params.ticketPrice) {
-      attributes.push({ trait_type: 'Price', value: params.ticketPrice });
-    }
-    if (params.tierIndex !== undefined) {
-      attributes.push({
-        trait_type: 'Tier Index',
-        value: params.tierIndex,
-        display_type: 'number',
-      });
-    }
-    if (params.maxSupply) {
-      attributes.push({
-        trait_type: 'Max Supply',
-        value: params.maxSupply,
-        display_type: 'number',
-      });
-    }
 
     const metadata: NftMetadata = {
       name: `${params.eventName} — ${params.tierName} #${params.tokenId}`,
@@ -239,5 +211,34 @@ export class IpfsService implements OnModuleInit {
         'IPFS not configured. Set PINATA_JWT or PINATA_API_KEY + PINATA_API_SECRET in .env',
       );
     }
+  }
+
+  /** Fetch with timeout and exponential retry */
+  private async fetchWithRetry<T>(url: string, init: RequestInit, label: string): Promise<T> {
+    for (let attempt = 1; attempt <= IpfsService.MAX_RETRIES; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), IpfsService.FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(url, { ...init, signal: controller.signal });
+        if (res.ok) return (await res.json()) as T;
+        const text = await res.text();
+        if (res.status >= 400 && res.status < 500) {
+          throw new Error(`Pinata ${label} failed (${res.status}): ${text}`);
+        }
+        this.logger.warn(`Pinata ${label} attempt ${attempt} failed (${res.status})`);
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          this.logger.warn(`Pinata ${label} attempt ${attempt} timed out`);
+        } else if (attempt === IpfsService.MAX_RETRIES) {
+          throw err;
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (attempt < IpfsService.MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+      }
+    }
+    throw new Error(`Pinata ${label} failed after ${IpfsService.MAX_RETRIES} attempts`);
   }
 }

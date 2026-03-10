@@ -11,13 +11,13 @@ interface BadgeProps {
   style?: ViewStyle;
 }
 
-const variantColors: Record<BadgeVariant, { bg: string; text: string }> = {
-  default: { bg: Colors.surfaceLight, text: Colors.textSecondary },
-  success: { bg: 'rgba(16, 185, 129, 0.15)', text: Colors.success },
-  error: { bg: 'rgba(239, 68, 68, 0.15)', text: Colors.error },
-  warning: { bg: 'rgba(245, 158, 11, 0.15)', text: Colors.warning },
-  info: { bg: 'rgba(0, 217, 255, 0.15)', text: Colors.accent },
-  primary: { bg: 'rgba(108, 99, 255, 0.15)', text: Colors.primary },
+const variantColors: Record<BadgeVariant, { bg: string; text: string; border: string }> = {
+  default: { bg: Colors.glass, text: Colors.textSecondary, border: Colors.glassBorder },
+  success: { bg: Colors.successMuted, text: Colors.success, border: 'rgba(0, 214, 143, 0.2)' },
+  error: { bg: Colors.errorMuted, text: Colors.error, border: 'rgba(255, 77, 106, 0.2)' },
+  warning: { bg: Colors.warningMuted, text: Colors.warning, border: 'rgba(255, 184, 0, 0.2)' },
+  info: { bg: Colors.accentMuted, text: Colors.accent, border: 'rgba(0, 229, 255, 0.2)' },
+  primary: { bg: Colors.primaryMuted, text: Colors.primary, border: 'rgba(123, 110, 246, 0.2)' },
 };
 
 export function Badge({ label, variant = 'default', size = 'sm', style }: BadgeProps) {
@@ -28,7 +28,7 @@ export function Badge({ label, variant = 'default', size = 'sm', style }: BadgeP
       style={[
         styles.base,
         size === 'md' && styles.md,
-        { backgroundColor: colors.bg },
+        { backgroundColor: colors.bg, borderColor: colors.border },
         style,
       ]}
     >
@@ -43,20 +43,22 @@ const styles = StyleSheet.create({
   base: {
     alignSelf: 'flex-start',
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
   },
   md: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
   },
   text: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes['2xs'],
+    fontWeight: Typography.weights.bold,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   textMd: {
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.xs,
   },
 });

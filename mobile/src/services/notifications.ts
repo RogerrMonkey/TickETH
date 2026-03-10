@@ -1,7 +1,11 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { NOTIFICATION_CHANNEL_ID } from '../constants/config';
+
+/** True when running inside Expo Go (not a dev build) */
+const isExpoGo = Constants.appOwnership === 'expo';
 
 /** Configure notification behavior */
 export function configureNotifications(): void {
@@ -18,6 +22,12 @@ export function configureNotifications(): void {
 
 /** Register for push notifications and return the Expo push token */
 export async function registerForPushNotifications(): Promise<string | null> {
+  // Push notifications are not available in Expo Go (SDK 53+)
+  if (isExpoGo) {
+    if (__DEV__) console.log('Push notifications skipped in Expo Go — use a dev build');
+    return null;
+  }
+
   if (!Device.isDevice) {
     console.warn('Push notifications require a physical device');
     return null;
@@ -49,8 +59,13 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   // Get push token
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+  if (!projectId) {
+    console.warn('Missing EAS projectId — push tokens unavailable');
+    return null;
+  }
   const tokenResponse = await Notifications.getExpoPushTokenAsync({
-    projectId: 'ticketh-mobile',
+    projectId,
   });
   return tokenResponse.data;
 }

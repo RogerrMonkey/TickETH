@@ -16,6 +16,7 @@ import { shortenAddress, formatRelativeTime } from '@/lib/utils';
 import { parseError } from '@/lib/error-parser';
 import { toast } from 'sonner';
 import type { OrganizerRequest } from '@/lib/types';
+import { PageHeader } from '@/components/PageHeader';
 
 export default function AdminRequestsPage() {
   useRequireAuth(['admin']);
@@ -83,7 +84,7 @@ export default function AdminRequestsPage() {
       <main className="flex-1 px-4 py-10">
         <div className="mx-auto max-w-5xl">
           {/* Header */}
-          <div className="mb-8">
+          <div>
             <button
               onClick={() => history.back()}
               className="mb-4 inline-flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
@@ -93,14 +94,7 @@ export default function AdminRequestsPage() {
               </svg>
               Back to Admin
             </button>
-            <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Review</span>
-            <h1 className="mt-2 text-4xl font-extrabold">
-              Organizer{' '}
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Requests</span>
-            </h1>
-            <p className="mt-1 text-muted">
-              {requests.filter((r) => r.status === 'pending').length} pending review
-            </p>
+            <PageHeader category="Review" title="Organizer" highlight="Requests" description={`${requests.filter((r) => r.status === 'pending').length} pending review`} />
           </div>
 
 

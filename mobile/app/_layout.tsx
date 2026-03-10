@@ -10,6 +10,7 @@ import { AuthProvider } from '../src/providers/AuthProvider';
 import { WalletProvider } from '../src/providers/WalletProvider';
 import { CheckinProvider } from '../src/providers/CheckinProvider';
 import { ToastProvider } from '../src/services/toast';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { Colors } from '../src/constants/theme';
 
 // Prevent splash screen from hiding immediately
@@ -26,6 +27,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
+      <ErrorBoundary>
       <SafeAreaProvider>
         <ThirdwebProvider>
           <AuthProvider>
@@ -75,6 +77,22 @@ export default function RootLayout() {
                     name="marketplace/[id]"
                     options={{ headerShown: false, animation: 'slide_from_bottom' }}
                   />
+                  <Stack.Screen
+                    name="settings"
+                    options={{ headerShown: false, animation: 'slide_from_right' }}
+                  />
+                  <Stack.Screen
+                    name="faq"
+                    options={{ headerShown: false, animation: 'slide_from_right' }}
+                  />
+                  <Stack.Screen
+                    name="help-support"
+                    options={{ headerShown: false, animation: 'slide_from_right' }}
+                  />
+                  <Stack.Screen
+                    name="terms"
+                    options={{ headerShown: false, animation: 'slide_from_right' }}
+                  />
                 </Stack>
               </ToastProvider>
               </CheckinProvider>
@@ -82,6 +100,7 @@ export default function RootLayout() {
           </AuthProvider>
         </ThirdwebProvider>
       </SafeAreaProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

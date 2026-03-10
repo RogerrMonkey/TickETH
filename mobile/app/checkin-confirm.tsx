@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Alert,
-  Animated,
 } from 'react-native';
+import ReAnimated from 'react-native-reanimated';
+import { useFadeIn, useSlideIn } from '../src/utils/animations';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,16 +41,11 @@ export default function CheckinConfirmScreen() {
   const [timeLeft, setTimeLeft] = useState(CONFIRMATION_TIMEOUT_SEC);
   const [showConfetti, setShowConfetti] = useState(false);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
-  const resultFade = useRef(new Animated.Value(0)).current;
+  const contentStyle = useFadeIn(0);
+  const resultStyle = useFadeIn(confirmed || denied ? 0 : 99999);
 
   useEffect(() => {
     analytics.screenView('checkin_confirm');
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 8, useNativeDriver: true }),
-    ]).start();
   }, []);
 
   // Countdown timer
@@ -98,8 +94,6 @@ export default function CheckinConfirmScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       analytics.track('checkin_confirmed', { checkinLogId });
       showToast({ type: 'success', title: 'Check-in confirmed!' });
-
-      Animated.timing(resultFade, { toValue: 1, duration: 500, useNativeDriver: true }).start();
     } catch (err: any) {
       const parsed = parseError(err);
       setError(parsed.message);
@@ -125,7 +119,6 @@ export default function CheckinConfirmScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
             analytics.track('checkin_denied', { checkinLogId });
             showToast({ type: 'info', title: 'Check-in denied' });
-            Animated.timing(resultFade, { toValue: 1, duration: 500, useNativeDriver: true }).start();
           },
         },
       ],
@@ -137,23 +130,33 @@ export default function CheckinConfirmScreen() {
     return (
       <SafeAreaView style={styles.container}>
         {showConfetti && <ConfettiAnimation />}
-        <Animated.View style={[styles.resultContainer, { opacity: resultFade }]}>
-          <View style={[styles.resultIcon, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
-            <Ionicons name="checkmark-circle" size={96} color={Colors.success} />
+        <ReAnimated.View style={[styles.resultContainer, resultStyle]}>
+          <View style={[styles.resultIcon, styles.resultIconSuccess]}>
+            <View style={styles.resultIconInner}>
+              <Ionicons name="checkmark-circle" size={80} color={Colors.success} />
+            </View>
           </View>
-          <Text style={styles.resultTitle}>Check-in Confirmed!</Text>
+          <Text style={styles.resultTitle}>Entry Granted!</Text>
+          <Text style={styles.resultSubtitle}>Welcome to the event</Text>
           <Text style={styles.resultMessage}>
-            You're all set. Enjoy the event!
+            Your check-in has been confirmed successfully.{'\n'}Show this screen to the volunteer if needed.
           </Text>
+          {ticket && (
+            <View style={styles.resultTicketInfo}>
+              <Text style={styles.resultTicketEvent}>{ticket.event?.title ?? 'Event'}</Text>
+              <Text style={styles.resultTicketTier}>{ticket.tier?.name ?? 'General'} · Token #{ticket.token_id}</Text>
+            </View>
+          )}
           <Button
             title="Done"
             onPress={() => router.back()}
             variant="primary"
             fullWidth
             size="lg"
-            style={{ marginTop: Spacing['3xl'] }}
+            style={{ marginTop: Spacing['2xl'] }}
+            icon={<Ionicons name="checkmark" size={20} color={Colors.textPrimary} />}
           />
-        </Animated.View>
+        </ReAnimated.View>
       </SafeAreaView>
     );
   }
@@ -162,13 +165,16 @@ export default function CheckinConfirmScreen() {
   if (denied) {
     return (
       <SafeAreaView style={styles.container}>
-        <Animated.View style={[styles.resultContainer, { opacity: resultFade }]}>
-          <View style={[styles.resultIcon, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
-            <Ionicons name="close-circle" size={96} color={Colors.error} />
+        <ReAnimated.View style={[styles.resultContainer, resultStyle]}>
+          <View style={[styles.resultIcon, styles.resultIconDenied]}>
+            <View style={styles.resultIconInner}>
+              <Ionicons name="close-circle" size={80} color={Colors.error} />
+            </View>
           </View>
-          <Text style={styles.resultTitle}>Check-in Denied</Text>
+          <Text style={styles.resultTitle}>Entry Denied</Text>
+          <Text style={styles.resultSubtitle}>Check-in was rejected</Text>
           <Text style={styles.resultMessage}>
-            This check-in attempt has been rejected.
+            This check-in attempt has been denied.{'\n'}Contact event staff if this was a mistake.
           </Text>
           <Button
             title="Done"
@@ -176,9 +182,9 @@ export default function CheckinConfirmScreen() {
             variant="outline"
             fullWidth
             size="lg"
-            style={{ marginTop: Spacing['3xl'] }}
+            style={{ marginTop: Spacing['2xl'] }}
           />
-        </Animated.View>
+        </ReAnimated.View>
       </SafeAreaView>
     );
   }
@@ -192,8 +198,8 @@ export default function CheckinConfirmScreen() {
         onLeftPress={() => router.back()}
       />
 
-      <Animated.View
-        style={[styles.content, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}
+      <ReAnimated.View
+        style={[styles.content, contentStyle]}
       >
         {/* Timer */}
         <View style={styles.timerContainer}>
@@ -205,15 +211,17 @@ export default function CheckinConfirmScreen() {
 
         {/* Illustration */}
         <View style={styles.alertIcon}>
-          <Ionicons name="scan-circle" size={80} color={Colors.primary} />
+          <View style={styles.alertIconOuter}>
+            <Ionicons name="scan-circle" size={72} color={Colors.primary} />
+          </View>
         </View>
 
         <Text style={styles.title} accessibilityRole="header">
-          Confirm Your Entry
+          Awaiting Confirmation
         </Text>
         <Text style={styles.subtitle}>
           A volunteer has scanned your ticket.{'\n'}
-          Please confirm to complete check-in.
+          Confirm below to complete your entry.
         </Text>
 
         {/* Ticket info */}
@@ -271,7 +279,7 @@ export default function CheckinConfirmScreen() {
         <Text style={styles.securityNote}>
           Your wallet signature verifies ticket ownership on-chain
         </Text>
-      </Animated.View>
+      </ReAnimated.View>
     </SafeAreaView>
   );
 }
@@ -304,18 +312,20 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     alignItems: 'center',
   },
   timerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.glass,
     borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   timerText: {
     fontSize: Typography.sizes.md,
@@ -326,11 +336,22 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     marginBottom: Spacing.lg,
   },
+  alertIconOuter: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(123, 110, 246, 0.2)',
+  },
   title: {
     color: Colors.textPrimary,
     fontSize: Typography.sizes['2xl'],
     fontWeight: Typography.weights.extrabold,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
   subtitle: {
     color: Colors.textSecondary,
@@ -370,16 +391,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    backgroundColor: 'rgba(239,68,68,0.1)',
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
+    backgroundColor: Colors.errorMuted,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
     width: '100%',
     marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,77,106,0.15)',
   },
   errorText: {
     color: Colors.error,
     fontSize: Typography.sizes.sm,
     flex: 1,
+    lineHeight: 20,
   },
   actions: {
     width: '100%',
@@ -391,6 +415,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     textAlign: 'center',
     marginTop: Spacing['2xl'],
+    lineHeight: 18,
   },
   /* Result screens */
   resultContainer: {
@@ -405,17 +430,66 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing['2xl'],
+  },
+  resultIconSuccess: {
+    backgroundColor: Colors.successMuted,
+    borderWidth: 2,
+    borderColor: 'rgba(0, 214, 143, 0.2)',
+  },
+  resultIconDenied: {
+    backgroundColor: Colors.errorMuted,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 77, 106, 0.2)',
+  },
+  resultIconInner: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.glass,
   },
   resultTitle: {
     color: Colors.textPrimary,
-    fontSize: Typography.sizes['2xl'],
+    fontSize: Typography.sizes['3xl'],
     fontWeight: Typography.weights.extrabold,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  resultSubtitle: {
+    color: Colors.textSecondary,
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.medium,
+    marginTop: Spacing.xs,
   },
   resultMessage: {
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     fontSize: Typography.sizes.md,
     textAlign: 'center',
-    marginTop: Spacing.sm,
+    marginTop: Spacing.md,
+    lineHeight: 22,
+  },
+  resultTicketInfo: {
+    marginTop: Spacing.xl,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    width: '100%',
+  },
+  resultTicketEvent: {
+    color: Colors.textPrimary,
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+    textAlign: 'center',
+  },
+  resultTicketTier: {
+    color: Colors.textMuted,
+    fontSize: Typography.sizes.sm,
+    marginTop: 4,
   },
 });

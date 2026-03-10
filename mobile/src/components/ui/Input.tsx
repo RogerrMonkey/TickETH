@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.error,
   },
   iconWrapper: {
-    paddingLeft: Spacing.md,
+    paddingLeft: Spacing.lg,
   },
   input: {
     flex: 1,

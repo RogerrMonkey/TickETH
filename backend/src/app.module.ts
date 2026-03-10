@@ -20,6 +20,7 @@ import { IpfsModule } from './ipfs/ipfs.module';
 import { QueuesModule } from './queues/queues.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { DpdpModule } from './dpdp/dpdp.module';
+import { SupportModule } from './support/support.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -77,6 +78,9 @@ import { HealthController } from './health.controller';
 
     // Phase 6: DPDP compliance
     DpdpModule,
+
+    // Phase 7: Support system
+    SupportModule,
   ],
   controllers: [HealthController],
   providers: [

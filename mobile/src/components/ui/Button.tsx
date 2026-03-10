@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
-  TouchableOpacity,
   Text,
   StyleSheet,
   ActivityIndicator,
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
+import { useScalePress } from '../../utils/animations';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -38,43 +40,68 @@ export function Button({
   fullWidth = false,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const { onPressIn, onPressOut, animatedStyle: scaleStyle } = useScalePress(0.96);
+
+  const tap = Gesture.Tap()
+    .enabled(!isDisabled)
+    .onBegin(() => {
+      'worklet';
+      onPressIn();
+    })
+    .onFinalize(() => {
+      'worklet';
+      onPressOut();
+    })
+    .onEnd(() => {
+      'worklet';
+      if (!isDisabled) {
+        // runOnJS not needed here — we handle via onTouchEnd
+      }
+    });
+
+  const handlePress = useCallback(() => {
+    if (!isDisabled) onPress();
+  }, [isDisabled, onPress]);
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={isDisabled}
-      activeOpacity={0.7}
-      style={[
-        styles.base,
-        styles[variant],
-        styles[`size_${size}`],
-        fullWidth && styles.fullWidth,
-        isDisabled && styles.disabled,
-        style,
-      ]}
-    >
-      {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.textPrimary}
-        />
-      ) : (
-        <>
-          {icon}
-          <Text
-            style={[
-              styles.text,
-              styles[`text_${variant}`],
-              styles[`text_${size}`],
-              icon ? { marginLeft: Spacing.sm } : undefined,
-              textStyle,
-            ]}
-          >
-            {title}
-          </Text>
-        </>
-      )}
-    </TouchableOpacity>
+    <GestureDetector gesture={tap}>
+      <Animated.View
+        style={[
+          styles.base,
+          styles[variant],
+          styles[`size_${size}`],
+          fullWidth && styles.fullWidth,
+          isDisabled && styles.disabled,
+          scaleStyle,
+          style,
+        ]}
+        onTouchEnd={handlePress}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isDisabled }}
+      >
+        {loading ? (
+          <ActivityIndicator
+            size="small"
+            color={variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.textPrimary}
+          />
+        ) : (
+          <>
+            {icon}
+            <Text
+              style={[
+                styles.text,
+                styles[`text_${variant}`],
+                styles[`text_${size}`],
+                icon ? { marginLeft: Spacing.sm } : undefined,
+                textStyle,
+              ]}
+            >
+              {title}
+            </Text>
+          </>
+        )}
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -91,11 +118,13 @@ const styles = StyleSheet.create({
   },
   secondary: {
     backgroundColor: Colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: Colors.primary,
+    borderColor: Colors.borderActive,
   },
   ghost: {
     backgroundColor: 'transparent',
@@ -108,6 +137,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     minHeight: 36,
+    borderRadius: BorderRadius.sm,
   },
   size_md: {
     paddingVertical: Spacing.md,
@@ -118,16 +148,18 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing['2xl'],
     minHeight: 56,
+    borderRadius: BorderRadius.lg,
   },
   fullWidth: {
     width: '100%',
   },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
   // Text
   text: {
-    fontWeight: Typography.weights.semibold,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 0.3,
   },
   text_primary: {
     color: Colors.textPrimary,

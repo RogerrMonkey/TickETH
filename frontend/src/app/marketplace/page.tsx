@@ -13,13 +13,13 @@ import { CardSkeleton } from '@/components/Skeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { Modal } from '@/components/Modal';
 import { Input } from '@/components/Input';
-import { TransactionTracker, type TxStep } from '@/components/TransactionTracker';
+import { TransactionTracker } from '@/components/TransactionTracker';
 import { marketplaceApi, ticketsApi } from '@/lib/api';
 import { thirdwebClient, activeChain, MARKETPLACE_ADDRESS, BLOCK_EXPLORER } from '@/lib/constants';
 import { formatPrice, shortenAddress, formatRelativeTime } from '@/lib/utils';
 import { useAuthStore } from '@/lib/store';
 import { cn } from '@/lib/cn';
-import { useDebounce } from '@/lib/hooks';
+import { useDebounce, useTransaction } from '@/lib/hooks';
 import { parseError } from '@/lib/error-parser';
 import { TiltCard, SpotlightSection, GlowBorder } from '@/components/ui/AnimatedElements';
 import { toast } from 'sonner';
@@ -76,9 +76,7 @@ function MarketplacePage() {
   const [sort, setSort] = useState('newest');
 
   // Buy flow
-  const [txStep, setTxStep] = useState<TxStep | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [txError, setTxError] = useState<string | null>(null);
+  const tx = useTransaction();
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [buyingListing, setBuyingListing] = useState<Listing | null>(null);
 
@@ -88,6 +86,7 @@ function MarketplacePage() {
   const [listingTicket, setListingTicket] = useState<Ticket | null>(null);
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
   const [listingInProgress, setListingInProgress] = useState(false);
+  const [listPriceError, setListPriceError] = useState<string | null>(null);
 
   const loadListings = useCallback(async () => {
     try {
@@ -128,6 +127,54 @@ function MarketplacePage() {
     if (listTicketId && user) loadMyTickets();
   }, [listTicketId, user, loadMyTickets]);
 
+  // Price bounds for the selected listing ticket
+  const listPriceBounds = useMemo(() => {
+    if (!listingTicket?.tier) return null;
+    const tier = listingTicket.tier;
+    const deviationBps = tier.max_price_deviation_bps ?? tier.maxPriceDeviationBps ?? 0;
+    const originalWei = tier.price_wei ?? tier.priceWei ?? '0';
+    if (!deviationBps || deviationBps === 0 || originalWei === '0') return null;
+
+    const original = BigInt(originalWei);
+    const bps = BigInt(deviationBps);
+    const basis = BigInt(10000);
+    const minWei = original - (original * bps) / basis;
+    const maxWei = original + (original * bps) / basis;
+    const minPol = Number(minWei) / 1e18;
+    const maxPol = Number(maxWei) / 1e18;
+    return { minPol, maxPol, deviationPct: deviationBps / 100 };
+  }, [listingTicket]);
+
+  // Resale info for listing ticket
+  const listResaleInfo = useMemo(() => {
+    if (!listingTicket?.tier) return null;
+    const maxResales = listingTicket.tier.max_resales ?? listingTicket.tier.maxResales ?? 0;
+    const used = listingTicket.transfer_count ?? listingTicket.transferCount ?? 0;
+    if (maxResales === 0) return { unlimited: true, used, remaining: Infinity };
+    return { unlimited: false, used, remaining: maxResales - used, max: maxResales };
+  }, [listingTicket]);
+
+  // Check if listing ticket event has started
+  const listEventStarted = useMemo(() => {
+    if (!listingTicket?.event?.start_time) return false;
+    return new Date(listingTicket.event.start_time) <= new Date();
+  }, [listingTicket]);
+
+  // Validate list price
+  const handleListPriceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setListPrice(val);
+    if (!val) { setListPriceError(null); return; }
+    const num = parseFloat(val);
+    if (isNaN(num) || num <= 0) {
+      setListPriceError('Enter a valid price');
+    } else if (listPriceBounds && (num < listPriceBounds.minPol || num > listPriceBounds.maxPol)) {
+      setListPriceError(`Price must be between ${listPriceBounds.minPol.toFixed(4)} and ${listPriceBounds.maxPol.toFixed(4)} POL`);
+    } else {
+      setListPriceError(null);
+    }
+  }, [listPriceBounds]);
+
   const filtered = useMemo(() => {
     if (!Array.isArray(listings)) return [];
     let result = listings;
@@ -136,8 +183,9 @@ function MarketplacePage() {
       const q = debouncedSearch.toLowerCase();
       result = result.filter(
         (l) =>
+          (l as any).event?.title?.toLowerCase().includes(q) ||
           (l as any).event?.name?.toLowerCase().includes(q) ||
-          (l as any).ticket?.event?.name?.toLowerCase().includes(q) ||
+          (l as any).ticket?.event?.title?.toLowerCase().includes(q) ||
           (l.sellerAddress || l.sellerWallet || l.seller_wallet || '').toLowerCase().includes(q),
       );
     }
@@ -159,11 +207,7 @@ function MarketplacePage() {
     if (!account) return;
     setBuyingListing(listing);
     setShowBuyModal(true);
-    setTxStep('preparing');
-    setTxError(null);
-    setTxHash(null);
-
-    try {
+    await tx.execute(async ({ setStep, setHash }) => {
       const contract = getContract({
         client: thirdwebClient,
         chain: activeChain,
@@ -172,43 +216,31 @@ function MarketplacePage() {
 
       const listingPriceWei = listing.asking_price_wei || listing.askingPriceWei || listing.price || '0';
 
-      const tx = prepareContractCall({
+      const prepared = prepareContractCall({
         contract,
         method: 'function buyListing(uint256 listingId) payable',
         params: [BigInt(listing.listingId ?? listing.listing_id ?? 0)],
         value: BigInt(listingPriceWei),
       });
 
-      setTxStep('awaiting-signature');
-      const result = await sendTx(tx);
+      setStep('awaiting-signature');
+      const result = await sendTx(prepared);
 
-      setTxStep('broadcasting');
-      setTxHash(result.transactionHash);
+      setStep('broadcasting');
+      setHash(result.transactionHash);
 
-      setTxStep('confirming');
+      setStep('confirming');
       marketplaceApi.completeSale(listing.id, { txHash: result.transactionHash }).catch(() => {});
 
-      setTxStep('success');
+      setStep('success');
       toast.success('Ticket purchased successfully!');
       loadListings();
-    } catch (err) {
-      const parsed = parseError(err);
-      setTxStep('error');
-      setTxError(parsed.message);
-
-      if (parsed.code === 'USER_REJECTED') {
-        toast('Purchase cancelled');
-      } else {
-        toast.error(parsed.title, { description: parsed.message });
-      }
-    }
+    });
   };
 
   const closeBuyModal = () => {
     setShowBuyModal(false);
-    setTxStep(null);
-    setTxError(null);
-    setTxHash(null);
+    tx.reset();
     setBuyingListing(null);
   };
 
@@ -332,7 +364,7 @@ function MarketplacePage() {
                 transition={{ duration: 0.2 }}
               >
                 {filtered.map((listing, i) => {
-                  const eventName = (listing as any).event?.name || (listing as any).ticket?.event?.name || 'Event Ticket';
+                  const eventName = (listing as any).event?.title || (listing as any).event?.name || (listing as any).ticket?.event?.title || 'Event Ticket';
                   const sellerAddr = listing.sellerAddress || listing.sellerWallet || listing.seller_wallet || '';
                   const isOwn = account?.address?.toLowerCase() === sellerAddr.toLowerCase();
                   const createdDate = listing.createdAt || listing.created_at;
@@ -394,12 +426,12 @@ function MarketplacePage() {
       {/* Buy Transaction Modal */}
       <Modal
         open={showBuyModal}
-        onClose={txStep === 'success' || txStep === 'error' ? closeBuyModal : () => {}}
+        onClose={tx.step === 'success' || tx.step === 'error' ? closeBuyModal : () => {}}
         title="Purchasing Ticket"
         size="sm"
       >
         <div className="py-2">
-          {buyingListing && txStep && (
+          {buyingListing && tx.step && (
             <>
               <div className="mb-4 rounded-xl bg-surface-light p-3 text-sm">
                 <div className="flex justify-between">
@@ -408,22 +440,22 @@ function MarketplacePage() {
                 </div>
               </div>
               <TransactionTracker
-                currentStep={txStep}
-                errorMessage={txError || undefined}
-                txHash={txHash || undefined}
+                currentStep={tx.step}
+                errorMessage={tx.error || undefined}
+                txHash={tx.hash || undefined}
                 blockExplorer={BLOCK_EXPLORER}
               />
             </>
           )}
 
-          {txStep === 'success' && (
+          {tx.step === 'success' && (
             <div className="mt-6 flex gap-3 justify-center">
               <Button variant="outline" onClick={closeBuyModal}>Close</Button>
               <Button onClick={() => { closeBuyModal(); router.push('/tickets'); }}>View My Tickets</Button>
             </div>
           )}
 
-          {txStep === 'error' && (
+          {tx.step === 'error' && (
             <div className="mt-6 flex gap-3 justify-center">
               <Button variant="outline" onClick={closeBuyModal}>Cancel</Button>
               {buyingListing && <Button onClick={() => handleBuy(buyingListing)}>Try Again</Button>}
@@ -466,7 +498,7 @@ function MarketplacePage() {
                         className="w-full rounded-xl border border-border bg-surface p-3 text-left hover:border-primary/30 transition-colors"
                       >
                         <p className="font-semibold text-sm">
-                          {t.event?.name || t.event?.title || `Event #${tEventId}`}
+                          {t.event?.title || t.event?.name || `Event #${tEventId}`}
                         </p>
                         <p className="text-xs text-muted mt-1">
                           {t.tier?.name || 'General'} · Token #{tTokenId ?? '?'}
@@ -481,19 +513,53 @@ function MarketplacePage() {
             <>
               <div className="rounded-xl border border-border bg-surface-light p-3">
                 <p className="font-semibold text-sm">
-                  {listingTicket.event?.name || listingTicket.event?.title || `Event #${listingTicket.eventId || listingTicket.event_id}`}
+                  {listingTicket.event?.title || listingTicket.event?.name || `Event #${listingTicket.eventId || listingTicket.event_id}`}
                 </p>
                 <p className="text-xs text-muted mt-1">Token #{listingTicket.tokenId ?? listingTicket.token_id ?? '?'}</p>
               </div>
-              <Input
-                label="Price (POL)"
-                type="number"
-                step="0.001"
-                min="0"
-                value={listPrice}
-                onChange={(e) => setListPrice(e.target.value)}
-                placeholder="0.1"
-              />
+
+              {/* Event started warning */}
+              {listEventStarted && (
+                <div className="rounded-xl border border-warning/30 bg-warning/5 p-3 flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-warning shrink-0">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                  <p className="text-xs text-warning">Event has already started. Listings are blocked.</p>
+                </div>
+              )}
+
+              {/* Resale count info */}
+              {listResaleInfo && (
+                <div className="rounded-xl border border-border bg-surface-light p-3">
+                  <p className="text-xs text-muted">
+                    {listResaleInfo.unlimited
+                      ? `Resales: ${listResaleInfo.used} (unlimited)`
+                      : `Resales: ${listResaleInfo.used}/${listResaleInfo.max} used` +
+                        (listResaleInfo.remaining === 0 ? ' — limit reached' : ` — ${listResaleInfo.remaining} remaining`)}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <Input
+                  label="Price (POL)"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={listPrice}
+                  onChange={handleListPriceChange}
+                  placeholder="0.1"
+                />
+                {listPriceError && (
+                  <p className="text-xs text-error mt-1">{listPriceError}</p>
+                )}
+                {listPriceBounds && !listPriceError && (
+                  <p className="text-xs text-muted mt-1">
+                    Allowed range (±{listPriceBounds.deviationPct}%): {listPriceBounds.minPol.toFixed(4)} – {listPriceBounds.maxPol.toFixed(4)} POL
+                  </p>
+                )}
+              </div>
+
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => setListingTicket(null)}>
                   Back
@@ -502,7 +568,7 @@ function MarketplacePage() {
                   className="flex-1"
                   onClick={handleCreateListing}
                   loading={listingInProgress}
-                  disabled={!listPrice || Number(listPrice) <= 0}
+                  disabled={!listPrice || Number(listPrice) <= 0 || !!listPriceError || listEventStarted || (listResaleInfo !== null && !listResaleInfo.unlimited && listResaleInfo.remaining <= 0)}
                 >
                   Create Listing
                 </Button>

@@ -1,18 +1,24 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, Animated } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Dimensions, Platform } from 'react-native';
+import ReAnimated from 'react-native-reanimated';
+import { useFadeIn, useSlideIn } from '../src/utils/animations';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ConnectButton } from 'thirdweb/react-native';
 import { inAppWallet, createWallet } from 'thirdweb/wallets';
 import * as Haptics from 'expo-haptics';
+import * as SecureStore from 'expo-secure-store';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../src/constants/theme';
-import { thirdwebClient, activeChain } from '../src/constants/config';
+import { thirdwebClient, activeChain, CHAIN_CONFIG } from '../src/constants/config';
 import { useAuth } from '../src/providers/AuthProvider';
+import { authApi } from '../src/api';
+import { useAuthStore } from '../src/stores/authStore';
+import { useWalletStore } from '../src/stores/walletStore';
 import { analytics } from '../src/services/analytics';
 import { Skeleton } from '../src/components/Skeleton';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 /** Wallets offered to users */
 const wallets = [
@@ -26,18 +32,62 @@ const wallets = [
   createWallet('me.rainbow'),
 ];
 
+/**
+ * Reconstruct the EIP-4361 SIWE message from thirdweb's LoginPayload.
+ * Must match thirdweb's internal createLoginMessage exactly.
+ */
+function createLoginMessage(payload: {
+  domain: string;
+  address: string;
+  statement: string;
+  uri?: string;
+  version: string;
+  chain_id?: string;
+  nonce: string;
+  issued_at: string;
+  expiration_time: string;
+  invalid_before?: string;
+  resources?: string[];
+}): string {
+  const header = `${payload.domain} wants you to sign in with your Ethereum account:`;
+  let prefix = [header, payload.address].join('\n');
+  prefix = [prefix, payload.statement].join('\n\n');
+  if (payload.statement) {
+    prefix += '\n';
+  }
+  const suffixArray: string[] = [];
+  if (payload.uri) {
+    suffixArray.push(`URI: ${payload.uri}`);
+  }
+  suffixArray.push(`Version: ${payload.version}`);
+  if (payload.chain_id) {
+    suffixArray.push(`Chain ID: ${payload.chain_id}`);
+  }
+  suffixArray.push(`Nonce: ${payload.nonce}`);
+  suffixArray.push(`Issued At: ${payload.issued_at}`);
+  suffixArray.push(`Expiration Time: ${payload.expiration_time}`);
+  if (payload.invalid_before) {
+    suffixArray.push(`Not Before: ${payload.invalid_before}`);
+  }
+  if (payload.resources) {
+    suffixArray.push(
+      ['Resources:', ...payload.resources.map((x) => `- ${x}`)].join('\n'),
+    );
+  }
+  const suffix = suffixArray.join('\n');
+  return [prefix, suffix].join('\n');
+}
+
 export default function AuthScreen() {
   const { loading, isAuthenticated, hydrated } = useAuth();
 
-  // Fade-in animation
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  // Reanimated staggered entrance styles
+  const logoStyle = useFadeIn(100);
+  const titleStyle = useSlideIn('up', 300, 20);
+  const featuresStyle = useSlideIn('up', 500, 30);
+  const ctaStyle = useSlideIn('up', 700, 40);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 50, friction: 8 }),
-    ]).start();
     analytics.screenView('auth');
   }, []);
 
@@ -56,26 +106,26 @@ export default function AuthScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
           <View style={styles.heroSection}>
-            <Skeleton width={96} height={96} borderRadius={24} />
-            <View style={{ height: 20 }} />
-            <Skeleton width={160} height={40} />
+            <Skeleton width={88} height={88} borderRadius={44} />
+            <View style={{ height: 24 }} />
+            <Skeleton width={180} height={36} borderRadius={8} />
             <View style={{ height: 12 }} />
-            <Skeleton width={220} height={16} />
+            <Skeleton width={240} height={16} borderRadius={4} />
           </View>
-          <View style={{ gap: Spacing.xl, paddingHorizontal: Spacing.lg }}>
+          <View style={{ gap: Spacing.xl, paddingHorizontal: Spacing.xl }}>
             {[1, 2, 3].map((i) => (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.lg }}>
-                <Skeleton width={44} height={44} borderRadius={10} />
+                <Skeleton width={48} height={48} borderRadius={24} />
                 <View style={{ flex: 1 }}>
-                  <Skeleton width="60%" height={15} />
-                  <View style={{ height: 4 }} />
-                  <Skeleton width="80%" height={12} />
+                  <Skeleton width="55%" height={14} borderRadius={4} />
+                  <View style={{ height: 6 }} />
+                  <Skeleton width="75%" height={12} borderRadius={4} />
                 </View>
               </View>
             ))}
           </View>
-          <View style={{ alignItems: 'center' }}>
-            <Skeleton width={width - Spacing['2xl'] * 2} height={56} borderRadius={BorderRadius.lg} />
+          <View style={{ alignItems: 'center', paddingHorizontal: Spacing.xl }}>
+            <Skeleton width={width - Spacing['3xl'] * 2} height={56} borderRadius={BorderRadius.lg} />
           </View>
         </View>
       </SafeAreaView>
@@ -84,50 +134,124 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.View
-        style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
-      >
+      <View style={styles.content}>
+        {/* Decorative background orbs */}
+        <View style={styles.orbPrimary} />
+        <View style={styles.orbAccent} />
+
         {/* Logo & branding */}
-        <View style={styles.heroSection}>
+        <ReAnimated.View
+          style={[styles.heroSection, logoStyle]}
+        >
           <View style={styles.logoContainer}>
-            <Ionicons name="ticket" size={48} color={Colors.primary} />
+            <View style={styles.logoInner}>
+              <Ionicons name="ticket" size={36} color={Colors.primary} />
+            </View>
           </View>
+        </ReAnimated.View>
+
+        <ReAnimated.View
+          style={[
+            { alignItems: 'center' },
+            titleStyle,
+          ]}
+        >
           <Text style={styles.appName}>TickETH</Text>
           <Text style={styles.tagline}>
-            Blockchain NFT Ticketing{'\n'}Secure. Transparent. Yours.
+            NFT Ticketing on Blockchain
           </Text>
-        </View>
+          <Text style={styles.taglineSub}>
+            Secure · Transparent · Yours
+          </Text>
+        </ReAnimated.View>
 
         {/* Features */}
-        <View style={styles.features}>
+        <ReAnimated.View
+          style={[
+            styles.features,
+            featuresStyle,
+          ]}
+        >
           <FeatureRow
             icon="shield-checkmark"
+            color={Colors.success}
             title="Fraud-Proof Tickets"
             desc="Every ticket is a verifiable NFT on Polygon"
           />
           <FeatureRow
             icon="qr-code"
+            color={Colors.accent}
             title="Instant Check-in"
             desc="Dynamic QR codes with two-step verification"
           />
           <FeatureRow
             icon="swap-horizontal"
+            color={Colors.primary}
             title="Safe Resale"
             desc="Controlled marketplace with price caps"
           />
-        </View>
+        </ReAnimated.View>
 
         {/* Thirdweb Connect Button */}
-        <View style={styles.connectSection}>
+        <ReAnimated.View
+          style={[
+            styles.connectSection,
+            ctaStyle,
+          ]}
+        >
           <ConnectButton
             client={thirdwebClient}
             wallets={wallets}
             chain={activeChain}
+            chains={[activeChain]}
+            auth={{
+              async getLoginPayload({ address, chainId }) {
+                const { nonce } = await authApi.getNonce(address);
+                const now = new Date();
+                return {
+                  domain: 'ticketh.io',
+                  address,
+                  statement: 'Sign in to TickETH',
+                  uri: 'https://ticketh.io',
+                  version: '1',
+                  chain_id: String(chainId),
+                  nonce,
+                  issued_at: now.toISOString(),
+                  expiration_time: new Date(
+                    now.getTime() + 5 * 60 * 1000,
+                  ).toISOString(),
+                  invalid_before: now.toISOString(),
+                };
+              },
+              async doLogin({ payload, signature }) {
+                const message = createLoginMessage(payload);
+                await useAuthStore.getState().login(message, signature);
+                useWalletStore
+                  .getState()
+                  .setWallet(payload.address, CHAIN_CONFIG.chainId);
+              },
+              async isLoggedIn(address) {
+                const user = useAuthStore.getState().user;
+                if (user) {
+                  return (
+                    user.wallet_address.toLowerCase() ===
+                    address.toLowerCase()
+                  );
+                }
+                const token =
+                  await SecureStore.getItemAsync('ticketh_access_token');
+                return !!token;
+              },
+              async doLogout() {
+                await useAuthStore.getState().logout();
+                useWalletStore.getState().disconnect();
+              },
+            }}
             connectButton={{
-              label: loading ? 'Connecting...' : 'Connect Wallet',
+              label: 'Get Started',
               style: {
                 backgroundColor: Colors.primary,
-                width: width - Spacing['2xl'] * 2,
+                width: width - Spacing['3xl'] * 2,
                 height: 56,
                 borderRadius: BorderRadius.lg,
               },
@@ -139,33 +263,35 @@ export default function AuthScreen() {
             theme="dark"
           />
           <Text style={styles.disclaimer}>
-            By connecting, you agree to our Terms of Service and Privacy Policy
+            By connecting, you agree to our Terms of Service
           </Text>
-        </View>
+        </ReAnimated.View>
 
         {/* Network badge */}
         <View style={styles.networkBadge}>
           <View style={styles.networkDot} />
           <Text style={styles.networkText}>Polygon Amoy Testnet</Text>
         </View>
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 }
 
 function FeatureRow({
   icon,
+  color,
   title,
   desc,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
+  color: string;
   title: string;
   desc: string;
 }) {
   return (
     <View style={styles.featureRow}>
-      <View style={styles.featureIcon}>
-        <Ionicons name={icon} size={22} color={Colors.primary} />
+      <View style={[styles.featureIcon, { backgroundColor: `${color}15` }]}>
+        <Ionicons name={icon} size={22} color={color} />
       </View>
       <View style={styles.featureText}>
         <Text style={styles.featureTitle}>{title}</Text>
@@ -182,39 +308,78 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: Spacing['2xl'],
-    justifyContent: 'space-between',
-    paddingBottom: Spacing['3xl'],
+    paddingHorizontal: Spacing['3xl'],
+    justifyContent: 'center',
+    gap: Spacing['3xl'],
+    paddingBottom: Spacing['2xl'],
+    overflow: 'hidden',
+  },
+  // Decorative background orbs
+  orbPrimary: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: Colors.primary,
+    opacity: 0.06,
+    top: -60,
+    right: -80,
+  },
+  orbAccent: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: Colors.accent,
+    opacity: 0.05,
+    bottom: 60,
+    left: -60,
   },
   heroSection: {
     alignItems: 'center',
-    paddingTop: Spacing['5xl'],
   },
   logoContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
-    backgroundColor: Colors.surface,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: Colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.glow,
-    marginBottom: Spacing.xl,
+  },
+  logoInner: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   appName: {
     fontSize: Typography.sizes.hero,
     fontWeight: Typography.weights.extrabold,
     color: Colors.textPrimary,
-    letterSpacing: -1,
+    letterSpacing: -1.5,
   },
   tagline: {
-    fontSize: Typography.sizes.md,
+    fontSize: Typography.sizes.lg,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: Spacing.sm,
-    lineHeight: 22,
+  },
+  taglineSub: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   features: {
     gap: Spacing.xl,
+    paddingHorizontal: Spacing.xs,
   },
   featureRow: {
     flexDirection: 'row',
@@ -222,12 +387,13 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   featureIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surface,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   featureText: {
     flex: 1,
@@ -241,6 +407,7 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: Typography.sizes.sm,
     marginTop: 2,
+    lineHeight: 18,
   },
   connectSection: {
     alignItems: 'center',
@@ -248,23 +415,31 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     color: Colors.textMuted,
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes['2xs'],
     textAlign: 'center',
   },
   networkBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
+    alignSelf: 'center',
+    backgroundColor: Colors.glass,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   networkDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: Colors.success,
   },
   networkText: {
     color: Colors.textMuted,
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes['2xs'],
+    letterSpacing: 0.5,
   },
 });

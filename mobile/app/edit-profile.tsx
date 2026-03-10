@@ -10,6 +10,7 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -71,15 +72,27 @@ export default function EditProfileScreen() {
     return Object.keys(errs).length === 0;
   }, [email, displayName]);
 
-  const pickImage = async () => {
+  const pickImage = async (source: 'camera' | 'gallery') => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        showToast({ type: 'error', title: 'Permission needed', message: 'Allow photo access to upload an avatar' });
-        return;
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          showToast({ type: 'error', title: 'Permission needed', message: 'Allow camera access to take a photo' });
+          return;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          showToast({ type: 'error', title: 'Permission needed', message: 'Allow photo access to upload an avatar' });
+          return;
+        }
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const launchFn = source === 'camera'
+        ? ImagePicker.launchCameraAsync
+        : ImagePicker.launchImageLibraryAsync;
+
+      const result = await launchFn({
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
@@ -91,7 +104,6 @@ export default function EditProfileScreen() {
       setUploadingAvatar(true);
       setAvatarError(false);
       const localUri = result.assets[0].uri;
-      // Show local preview immediately
       setAvatarUrl(localUri);
 
       const publicUrl = await uploadAvatar(localUri);
@@ -101,11 +113,19 @@ export default function EditProfileScreen() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Upload failed';
       showToast({ type: 'error', title: 'Upload failed', message: msg });
-      // Revert to previous avatar
       setAvatarUrl(user?.avatar_url || '');
     } finally {
       setUploadingAvatar(false);
     }
+  };
+
+  const showAvatarOptions = () => {
+    Alert.alert('Change Avatar', 'Choose a source', [
+      { text: 'Take Photo', onPress: () => pickImage('camera') },
+      { text: 'Choose from Gallery', onPress: () => pickImage('gallery') },
+      ...(avatarUrl.trim() ? [{ text: 'Remove Avatar', style: 'destructive' as const, onPress: () => { setAvatarUrl(''); setAvatarError(false); } }] : []),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
   };
 
   const handleSave = async () => {
@@ -166,7 +186,7 @@ export default function EditProfileScreen() {
           {/* Avatar preview + upload */}
           <View style={styles.avatarSection}>
             <TouchableOpacity
-              onPress={pickImage}
+              onPress={showAvatarOptions}
               disabled={uploadingAvatar || saving}
               accessibilityLabel="Change avatar"
               accessibilityRole="button"
@@ -208,7 +228,7 @@ export default function EditProfileScreen() {
               </View>
             </TouchableOpacity>
             <Text style={styles.avatarHint}>
-              {uploadingAvatar ? 'Uploading...' : 'Tap to upload avatar'}
+              {uploadingAvatar ? 'Uploading...' : 'Tap to take photo or choose from gallery'}
             </Text>
           </View>
 
@@ -271,33 +291,6 @@ export default function EditProfileScreen() {
             )}
           </View>
 
-          {/* Avatar URL (fallback — paste a URL instead of uploading) */}
-          <View style={styles.field}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Avatar URL</Text>
-              <Text style={styles.optional}>or paste a link</Text>
-            </View>
-            <TextInput
-              style={[styles.input, errors.avatarUrl ? styles.inputError : null]}
-              value={avatarUrl}
-              onChangeText={(t) => {
-                setAvatarUrl(t);
-                setAvatarError(false);
-                setErrors((p) => ({ ...p, avatarUrl: '' }));
-              }}
-              placeholder="https://example.com/avatar.png"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="url"
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="done"
-              accessibilityLabel="Avatar URL"
-            />
-            <Text style={styles.helperText}>
-              Upload above or paste a direct image link
-            </Text>
-          </View>
-
           {/* Consent notice */}
           <View style={styles.consent}>
             <Ionicons
@@ -357,7 +350,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
@@ -367,19 +360,23 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: BorderRadius.md,
+    borderRadius: 20,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   headerTitle: {
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
     color: Colors.textPrimary,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
   headerRight: {
     width: 40,
   },
   scroll: {
-    padding: Spacing.lg,
+    padding: Spacing.xl,
     paddingBottom: Spacing['3xl'],
   },
   avatarSection: {
@@ -390,23 +387,23 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatarImage: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     borderWidth: 3,
-    borderColor: Colors.border,
+    borderColor: Colors.glassBorder,
   },
   avatarPlaceholder: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: Colors.border,
+    borderColor: Colors.glassBorder,
   },
   avatarInitial: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -414,9 +411,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -2,
     bottom: -2,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -446,7 +443,7 @@ const styles = StyleSheet.create({
   required: {
     fontSize: Typography.sizes.xs,
     color: Colors.error,
-    fontWeight: Typography.weights.semibold,
+    fontWeight: Typography.weights.bold,
   },
   optional: {
     fontSize: Typography.sizes.xs,
@@ -457,8 +454,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     fontSize: Typography.sizes.md,
     color: Colors.textPrimary,
   },
@@ -489,10 +486,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.sm,
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
+    backgroundColor: Colors.glass,
+    padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   consentText: {
     fontSize: Typography.sizes.xs,

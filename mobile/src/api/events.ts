@@ -22,18 +22,6 @@ export async function getEventById(id: string): Promise<TickETHEvent> {
   return data;
 }
 
-/** Get event statistics */
-export async function getEventStats(eventId: string) {
-  const { data } = await apiClient.get(`/events/${eventId}/stats`);
-  return data;
-}
-
-/** Get organizer's own events */
-export async function getMyEvents(): Promise<TickETHEvent[]> {
-  const { data } = await apiClient.get<TickETHEvent[]>('/events/organizer/mine');
-  return data;
-}
-
 /** Delete an event (organizer/admin only) */
 export async function deleteEvent(id: string): Promise<{ success: boolean; message: string }> {
   const { data } = await apiClient.delete<{ success: boolean; message: string }>(`/events/${id}`);

@@ -10,14 +10,14 @@ import { Footer } from '@/components/Footer';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { Modal } from '@/components/Modal';
-import { TransactionTracker, type TxStep } from '@/components/TransactionTracker';
+import { TransactionTracker } from '@/components/TransactionTracker';
 import { ticketsApi } from '@/lib/api';
 import { thirdwebClient, activeChain, BLOCK_EXPLORER } from '@/lib/constants';
-import { parseError } from '@/lib/error-parser';
 import { shortenAddress } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useEffect, useCallback } from 'react';
 import { DetailSkeleton } from '@/components/Skeleton';
+import { useTransaction } from '@/lib/hooks';
 import type { Ticket } from '@/lib/types';
 
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
@@ -34,9 +34,7 @@ export default function TransferTicketPage() {
   const [confirmStep, setConfirmStep] = useState(false);
 
   // Transaction tracking
-  const [txStep, setTxStep] = useState<TxStep | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [txError, setTxError] = useState<string | null>(null);
+  const tx = useTransaction();
   const [showTxModal, setShowTxModal] = useState(false);
 
   const loadTicket = useCallback(async () => {
@@ -64,54 +62,36 @@ export default function TransferTicketPage() {
     if (!account || !contractAddr || tokenId == null || !isValidAddress) return;
 
     setShowTxModal(true);
-    setTxStep('preparing');
-    setTxError(null);
-    setTxHash(null);
-
-    try {
+    await tx.execute(async ({ setStep, setHash }) => {
       const contract = getContract({
         client: thirdwebClient,
         chain: activeChain,
         address: contractAddr,
       });
 
-      const tx = prepareContractCall({
+      const prepared = prepareContractCall({
         contract,
         method: 'function safeTransferFrom(address from, address to, uint256 tokenId)',
         params: [account.address, recipientAddress, BigInt(tokenId)],
       });
 
-      setTxStep('awaiting-signature');
-      const result = await sendTx(tx);
+      setStep('awaiting-signature');
+      const result = await sendTx(prepared);
 
-      setTxStep('broadcasting');
-      setTxHash(result.transactionHash);
+      setStep('broadcasting');
+      setHash(result.transactionHash);
 
-      setTxStep('confirming');
-
-      setTxStep('success');
+      setStep('confirming');
+      setStep('success');
       toast.success('Ticket transferred successfully!');
-    } catch (err) {
-      const parsed = parseError(err);
-      setTxStep('error');
-      setTxError(parsed.message);
-
-      if (parsed.code === 'USER_REJECTED') {
-        toast('Transfer cancelled');
-      } else {
-        toast.error(parsed.title, { description: parsed.message });
-      }
-    }
+    });
   };
 
   const closeModal = () => {
     setShowTxModal(false);
-    setTxStep(null);
-    setTxError(null);
-    setTxHash(null);
-    if (txStep === 'success') {
-      router.push('/tickets');
-    }
+    const wasSuccess = tx.step === 'success';
+    tx.reset();
+    if (wasSuccess) router.push('/tickets');
   };
 
   if (loading) {
@@ -266,28 +246,28 @@ export default function TransferTicketPage() {
       {/* Transaction Modal */}
       <Modal
         open={showTxModal}
-        onClose={txStep === 'success' || txStep === 'error' ? closeModal : () => {}}
+        onClose={tx.step === 'success' || tx.step === 'error' ? closeModal : () => {}}
         title="Transferring Ticket"
         size="sm"
       >
         <div className="py-2">
-          {txStep && (
+          {tx.step && (
             <TransactionTracker
-              currentStep={txStep}
-              errorMessage={txError || undefined}
-              txHash={txHash || undefined}
+              currentStep={tx.step}
+              errorMessage={tx.error || undefined}
+              txHash={tx.hash || undefined}
               blockExplorer={BLOCK_EXPLORER}
             />
           )}
 
-          {txStep === 'success' && (
+          {tx.step === 'success' && (
             <div className="mt-6 flex gap-3 justify-center">
               <Button variant="outline" onClick={closeModal}>Close</Button>
               <Button onClick={() => router.push('/tickets')}>My Tickets</Button>
             </div>
           )}
 
-          {txStep === 'error' && (
+          {tx.step === 'error' && (
             <div className="mt-6 flex gap-3 justify-center">
               <Button variant="outline" onClick={closeModal}>Cancel</Button>
               <Button onClick={handleTransfer}>Try Again</Button>

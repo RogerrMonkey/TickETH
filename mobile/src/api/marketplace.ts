@@ -26,8 +26,9 @@ export async function getMyListings(): Promise<Listing[]> {
 /** Create a new listing (record after on-chain listTicket tx) */
 export async function createListing(payload: {
   ticketId: string;
-  price: string;
-  txHash: string;
+  askingPriceWei: string;
+  askingPrice?: number;
+  listingTxHash?: string;
 }): Promise<Listing> {
   const { data } = await apiClient.post<Listing>('/marketplace/list', payload);
   return data;
@@ -46,16 +47,4 @@ export async function completeSale(payload: {
 /** Cancel a listing (after on-chain cancelListing tx) */
 export async function cancelListing(listingId: string): Promise<void> {
   await apiClient.post(`/marketplace/cancel/${listingId}`);
-}
-
-/** Get resale history for a ticket */
-export async function getTicketHistory(ticketId: string): Promise<Listing[]> {
-  const { data } = await apiClient.get<Listing[]>(`/marketplace/history/${ticketId}`);
-  return data;
-}
-
-/** Get marketplace stats for an event */
-export async function getMarketplaceStats(eventId: string) {
-  const { data } = await apiClient.get(`/marketplace/stats/${eventId}`);
-  return data;
 }

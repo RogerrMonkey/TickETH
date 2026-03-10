@@ -123,44 +123,36 @@ export class OrganizerRequestsService {
     };
   }
 
-  /** Approve or reject a request (admin) */
+  /** Approve or reject a request (admin) — uses optimistic lock on status */
   async review(
     requestId: string,
     adminId: string,
     adminWallet: string,
     dto: ReviewRequestDto,
   ) {
-    // Fetch the request
-    const { data: request, error: fetchErr } = await this.supabase.admin
-      .from('organizer_requests')
-      .select('*')
-      .eq('id', requestId)
-      .single();
+    const newStatus = dto.approved ? RequestStatus.APPROVED : RequestStatus.REJECTED;
 
-    if (fetchErr || !request) throw new NotFoundException('Request not found');
-
-    if (request.status !== RequestStatus.PENDING) {
-      throw new ConflictException('Request already reviewed');
-    }
-
-    // Update request
+    // Atomically update only if still pending (prevents race condition)
     const { data, error } = await this.supabase.admin
       .from('organizer_requests')
       .update({
-        status: dto.approved ? RequestStatus.APPROVED : RequestStatus.REJECTED,
+        status: newStatus,
         rejection_reason: dto.approved ? null : dto.rejectionReason,
         reviewed_at: new Date().toISOString(),
         reviewed_by: adminId,
       })
       .eq('id', requestId)
+      .eq('status', RequestStatus.PENDING) // Optimistic lock
       .select('*')
       .single();
 
-    if (error) throw error;
+    if (error || !data) {
+      throw new ConflictException('Request not found or already reviewed');
+    }
 
     // If approved, upgrade user role
     if (dto.approved) {
-      await this.users.updateRole(request.user_id, UserRole.ORGANIZER);
+      await this.users.updateRole(data.user_id, UserRole.ORGANIZER);
     }
 
     await this.audit.log({
@@ -172,7 +164,7 @@ export class OrganizerRequestsService {
       entityType: 'organizer_request',
       entityId: requestId,
       details: {
-        org_name: request.org_name,
+        org_name: data.org_name,
         rejection_reason: dto.rejectionReason,
       },
     });

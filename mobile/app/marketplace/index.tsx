@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -7,8 +7,9 @@ import {
   RefreshControl,
   TouchableOpacity,
   ScrollView,
-  Animated,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { useStaggeredEntrance, useScalePress } from '../../src/utils/animations';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -162,6 +163,9 @@ export default function MarketplaceBrowseScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -195,32 +199,16 @@ function AnimatedListingCard({
   index: number;
   onPress: () => void;
 }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(16)).current;
-
-  useEffect(() => {
-    const delay = Math.min(index * 60, 300);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        delay,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        delay,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+  const entranceStyle = useStaggeredEntrance(index);
+  const { animatedStyle, onPressIn, onPressOut } = useScalePress(0.97);
 
   return (
-    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+    <Animated.View style={[entranceStyle, animatedStyle]}>
       <TouchableOpacity
         style={styles.listingCard}
         onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
         activeOpacity={0.8}
         accessibilityLabel={`Listing: ${listing.ticket?.event?.title ?? 'Ticket'}, price ${formatPrice(listing.price)}`}
         accessibilityRole="button"
@@ -247,7 +235,6 @@ function AnimatedListingCard({
     </Animated.View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -261,19 +248,22 @@ const styles = StyleSheet.create({
   },
   sortRow: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.md,
     gap: Spacing.sm,
     alignItems: 'center',
   },
   pill: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   pillActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryMuted,
+    borderColor: Colors.borderActive,
   },
   pillText: {
     color: Colors.textSecondary,
@@ -281,28 +271,33 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.medium,
   },
   pillTextActive: {
-    color: Colors.textPrimary,
+    color: Colors.primary,
+    fontWeight: Typography.weights.bold,
   },
   statsChip: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   statsChipText: {
     color: Colors.textMuted,
     fontSize: Typography.sizes.xs,
   },
   list: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing['6xl'],
   },
   listingCard: {
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     marginBottom: Spacing.md,
-    ...Shadows.sm,
+    ...Shadows.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   listingHeader: {
     flexDirection: 'row',
@@ -314,11 +309,12 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
+    letterSpacing: -0.2,
   },
   listingTier: {
     color: Colors.textMuted,
     fontSize: Typography.sizes.sm,
-    marginTop: 2,
+    marginTop: 3,
   },
   listingFooter: {
     flexDirection: 'row',
@@ -328,7 +324,11 @@ const styles = StyleSheet.create({
   listingSellerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    backgroundColor: Colors.glass,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.sm,
   },
   listingSeller: {
     color: Colors.textMuted,
@@ -338,6 +338,6 @@ const styles = StyleSheet.create({
   listingPrice: {
     color: Colors.primary,
     fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
+    fontWeight: Typography.weights.extrabold,
   },
 });

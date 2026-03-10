@@ -1,11 +1,9 @@
-import React, { createContext, useContext, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useActiveAccount, useActiveWallet, useDisconnect } from 'thirdweb/react-native';
 import { signMessage as twSignMessage } from 'thirdweb/utils';
 import { useWalletStore, type AppMode } from '../stores/walletStore';
 import { useAuthStore } from '../stores/authStore';
-import { authApi } from '../api';
-import { buildSiweMessage } from '../services/wallet';
 import { CHAIN_CONFIG } from '../constants/config';
 
 const MODE_STORAGE_KEY = 'ticketh_app_mode';
@@ -35,10 +33,10 @@ const WalletContext = createContext<WalletContextValue | null>(null);
  */
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const wallet = useWalletStore();
-  const login = useAuthStore((s) => s.login);
   const activeAccount = useActiveAccount();
   const activeWallet = useActiveWallet();
   const { disconnect: twDisconnect } = useDisconnect();
+  const isDisconnecting = useRef(false);
 
   // Restore persisted mode on mount
   useEffect(() => {
@@ -49,10 +47,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // When thirdweb connects a wallet, perform SIWE auth with backend
+  // Sync wallet state from thirdweb account
+  // (SIWE auth is handled by ConnectButton's auth prop in auth.tsx)
   useEffect(() => {
     if (!activeAccount?.address) {
-      // Wallet disconnected
+      // Skip if we initiated the disconnect — prevents cascading state changes
+      if (isDisconnecting.current) return;
       if (wallet.connected) {
         wallet.disconnect();
       }
@@ -60,57 +60,24 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
 
     const address = activeAccount.address;
-
-    // Already connected with this address — skip re-auth
-    if (wallet.address?.toLowerCase() === address.toLowerCase() && wallet.connected) {
-      return;
+    if (wallet.address?.toLowerCase() !== address.toLowerCase() || !wallet.connected) {
+      wallet.setWallet(address, CHAIN_CONFIG.chainId);
     }
-
-    // New wallet connected — perform SIWE auth
-    let cancelled = false;
-    (async () => {
-      wallet.setConnecting(true);
-      try {
-        // 1. Get nonce from backend
-        const { nonce } = await authApi.getNonce(address);
-
-        // 2. Build SIWE message
-        const message = buildSiweMessage({ address, nonce });
-
-        // 3. Sign with thirdweb account
-        const signature = await twSignMessage({
-          message,
-          account: activeAccount,
-        });
-
-        if (cancelled) return;
-
-        // 4. Verify on backend — creates user + returns JWT
-        await login(message, signature);
-
-        // 5. Set wallet state
-        wallet.setWallet(address, CHAIN_CONFIG.chainId);
-      } catch (err: any) {
-        if (cancelled) return;
-        console.error('SIWE auth failed:', err?.message ?? err);
-        // Disconnect the wallet if SIWE fails
-        if (activeWallet) {
-          twDisconnect(activeWallet);
-        }
-        wallet.setConnecting(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
   }, [activeAccount?.address]);
 
   // ─── Disconnect ─────────────────────────────────────────
   const disconnect = useCallback(async () => {
-    if (activeWallet) {
-      twDisconnect(activeWallet);
+    isDisconnecting.current = true;
+    try {
+      if (activeWallet) {
+        twDisconnect(activeWallet);
+      }
+      wallet.disconnect();
+      await useAuthStore.getState().logout();
+    } finally {
+      // Reset after a delay to allow all useEffect cycles to settle
+      setTimeout(() => { isDisconnecting.current = false; }, 500);
     }
-    wallet.disconnect();
-    await useAuthStore.getState().logout();
   }, [activeWallet, twDisconnect, wallet]);
 
   // ─── Sign Message ───────────────────────────────────────

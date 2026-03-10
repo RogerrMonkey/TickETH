@@ -9,6 +9,8 @@ import {
   Linking,
   Share,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { useFadeIn, useSlideIn, useScalePress } from '../../src/utils/animations';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +23,6 @@ import { ProfileSkeleton } from '../../src/components/Skeleton';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useWallet } from '../../src/providers/WalletProvider';
 import { shortenAddress } from '../../src/utils/format';
-import { CHAIN_CONFIG, CONTRACTS } from '../../src/constants/config';
 import { getAddressUrl } from '../../src/services/wallet';
 import { showToast } from '../../src/services/toast';
 import { analytics } from '../../src/services/analytics';
@@ -44,9 +45,14 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           analytics.track('wallet_disconnected', {});
-          await disconnect();
-          showToast({ type: 'info', title: 'Disconnected' });
+          // Navigate first, then disconnect to avoid cascading state changes
+          // killing the app before navigation completes
           router.replace('/auth');
+          // Small delay to ensure navigation starts before state clears
+          setTimeout(async () => {
+            await disconnect();
+            showToast({ type: 'info', title: 'Disconnected' });
+          }, 100);
         },
       },
     ]);
@@ -80,6 +86,8 @@ export default function ProfileScreen() {
   const avatarColor = address ? `#${address.slice(2, 8)}` : Colors.primary;
   const avatarInitial = address ? address.slice(2, 4).toUpperCase() : '?';
 
+  const actionsStyle = useFadeIn(600);
+
   // Show skeleton while hydrating
   if (!hydrated) {
     return (
@@ -98,21 +106,10 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.screenTitle} accessibilityRole="header">
-            Profile
-          </Text>
-        </View>
+        <AnimatedProfileHeader />
 
         {/* Avatar & wallet card */}
-        <View style={styles.profileCard}>
-          <View
-            style={[styles.avatar, { backgroundColor: avatarColor }]}
-            accessibilityLabel="Profile avatar"
-          >
-            <Text style={styles.avatarText}>{avatarInitial}</Text>
-          </View>
-
+        <AnimatedProfileCard avatarColor={avatarColor} avatarInitial={avatarInitial}>
           <Text style={styles.displayName}>
             {user?.display_name || 'TickETH User'}
           </Text>
@@ -154,41 +151,11 @@ export default function ProfileScreen() {
 
           {/* Quick actions row */}
           <View style={styles.quickActions}>
-            <TouchableOpacity
-              style={styles.quickAction}
-              onPress={viewOnExplorer}
-              accessibilityLabel="View on block explorer"
-              accessibilityRole="button"
-            >
-              <View style={styles.quickActionIcon}>
-                <Ionicons name="open-outline" size={18} color={Colors.primary} />
-              </View>
-              <Text style={styles.quickActionLabel}>Explorer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.quickAction}
-              onPress={shareAddress}
-              accessibilityLabel="Share wallet address"
-              accessibilityRole="button"
-            >
-              <View style={styles.quickActionIcon}>
-                <Ionicons name="share-outline" size={18} color={Colors.primary} />
-              </View>
-              <Text style={styles.quickActionLabel}>Share</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.quickAction}
-              onPress={copyAddress}
-              accessibilityLabel="Copy wallet address"
-              accessibilityRole="button"
-            >
-              <View style={styles.quickActionIcon}>
-                <Ionicons name="copy-outline" size={18} color={Colors.primary} />
-              </View>
-              <Text style={styles.quickActionLabel}>Copy</Text>
-            </TouchableOpacity>
+            <QuickActionButton icon="open-outline" label="Explorer" onPress={viewOnExplorer} accessibilityLabel="View on block explorer" />
+            <QuickActionButton icon="share-outline" label="Share" onPress={shareAddress} accessibilityLabel="Share wallet address" />
+            <QuickActionButton icon="copy-outline" label="Copy" onPress={copyAddress} accessibilityLabel="Copy wallet address" />
           </View>
-        </View>
+        </AnimatedProfileCard>
 
         {/* Email missing prompt */}
         {user && !user.email && (
@@ -212,7 +179,7 @@ export default function ProfileScreen() {
 
         {/* Account details */}
         {user && (
-          <View style={styles.section}>
+          <AnimatedSection delay={300}>
             <Text style={styles.sectionTitle}>Account Details</Text>
             <View style={styles.infoCard}>
               <InfoRow icon="finger-print" label="User ID" value={user.id.slice(0, 8) + '...'} />
@@ -225,23 +192,12 @@ export default function ProfileScreen() {
                 isLast
               />
             </View>
-          </View>
+          </AnimatedSection>
         )}
 
-        {/* Network info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Network</Text>
-          <View style={styles.infoCard}>
-            <InfoRow icon="globe" label="Chain" value={CHAIN_CONFIG.chainName} />
-            <InfoRow icon="link" label="Chain ID" value={String(CHAIN_CONFIG.chainId)} />
-            <InfoRow icon="server" label="Currency" value={CHAIN_CONFIG.nativeCurrency.symbol} />
-            <InfoRow icon="cube" label="Factory" value={shortenAddress(CONTRACTS.factory, 6)} isLast />
-          </View>
-        </View>
-
-        {/* Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Settings</Text>
+        {/* Quick Menu */}
+        <AnimatedSection delay={400}>
+          <Text style={styles.sectionTitle}>Quick Links</Text>
           <View style={styles.menuCard}>
             <MenuItem
               icon="person-outline"
@@ -254,41 +210,20 @@ export default function ProfileScreen() {
               }}
             />
             <MenuItem
-              icon="storefront-outline"
-              label="Marketplace"
-              subtitle="Browse & list tickets"
-              onPress={() => {
-                analytics.track('marketplace_opened', {});
-                router.push('/marketplace');
-              }}
-            />
-            <MenuItem
-              icon="notifications-outline"
-              label="Notifications"
-              subtitle="Manage push notifications"
+              icon="settings-outline"
+              label="Settings"
+              subtitle="Network, support, legal"
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                Alert.alert('Notifications', 'Push notifications are enabled.');
+                router.push('/settings');
               }}
-            />
-            <MenuItem
-              icon="help-circle-outline"
-              label="Help & Support"
-              subtitle="FAQ, contact us"
-              onPress={() => Linking.openURL('https://ticketh.io/support')}
-            />
-            <MenuItem
-              icon="document-text-outline"
-              label="Terms of Service"
-              subtitle="Legal & privacy"
-              onPress={() => Linking.openURL('https://ticketh.io/terms')}
               isLast
             />
           </View>
-        </View>
+        </AnimatedSection>
 
         {/* Disconnect */}
-        <View style={styles.actions}>
+        <Animated.View style={[styles.actions, actionsStyle]}>
           <Button
             title="Disconnect Wallet"
             onPress={handleLogout}
@@ -297,12 +232,82 @@ export default function ProfileScreen() {
             size="lg"
             icon={<Ionicons name="log-out" size={18} color={Colors.textPrimary} />}
           />
-        </View>
+        </Animated.View>
 
         <Text style={styles.version}>TickETH v1.0.0 • Polygon Amoy Testnet</Text>
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+/** Animated header with fade-in */
+function AnimatedProfileHeader() {
+  const style = useFadeIn(0);
+  return (
+    <Animated.View style={[styles.header, style]}>
+      <Text style={styles.screenTitle} accessibilityRole="header">
+        Profile
+      </Text>
+    </Animated.View>
+  );
+}
+
+/** Animated profile card with slide-up entrance */
+function AnimatedProfileCard({
+  avatarColor,
+  avatarInitial,
+  children,
+}: {
+  avatarColor: string;
+  avatarInitial: string;
+  children: React.ReactNode;
+}) {
+  const cardStyle = useSlideIn('down', 100, 30);
+  return (
+    <Animated.View style={[styles.profileCard, cardStyle]}>
+      <View style={[styles.avatar, { backgroundColor: avatarColor }]} accessibilityLabel="Profile avatar">
+        <Text style={styles.avatarText}>{avatarInitial}</Text>
+      </View>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Quick action button with scale press */
+function QuickActionButton({
+  icon,
+  label,
+  onPress,
+  accessibilityLabel,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
+  const { animatedStyle, onPressIn, onPressOut } = useScalePress(0.9);
+  return (
+    <TouchableOpacity
+      style={styles.quickAction}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      activeOpacity={0.7}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+    >
+      <Animated.View style={[styles.quickActionIcon, animatedStyle]}>
+        <Ionicons name={icon} size={18} color={Colors.primary} />
+      </Animated.View>
+      <Text style={styles.quickActionLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+/** Animated section wrapper */
+function AnimatedSection({ delay, children }: { delay: number; children: React.ReactNode }) {
+  const style = useFadeIn(delay);
+  return <Animated.View style={[styles.section, style]}>{children}</Animated.View>;
 }
 
 function InfoRow({
@@ -374,23 +379,26 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing['6xl'],
   },
   header: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
     paddingBottom: Spacing.md,
   },
   screenTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.sizes['3xl'],
     fontWeight: Typography.weights.extrabold,
+    letterSpacing: -0.5,
   },
   profileCard: {
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.lg,
+    marginHorizontal: Spacing.xl,
     padding: Spacing['2xl'],
     borderRadius: BorderRadius.xl,
-    ...Shadows.lg,
+    ...Shadows.card,
     gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   avatar: {
     width: 80,
@@ -399,6 +407,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.sm,
+    borderWidth: 3,
+    borderColor: Colors.glassBorder,
   },
   avatarText: {
     color: Colors.textPrimary,
@@ -409,21 +419,24 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
+    letterSpacing: -0.3,
   },
   addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     marginTop: Spacing.xs,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: Colors.glass,
     borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   addressDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: Colors.success,
   },
   addressText: {
@@ -433,67 +446,72 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: 'row',
-    gap: Spacing['2xl'],
-    marginTop: Spacing.lg,
+    gap: Spacing['3xl'],
+    marginTop: Spacing.xl,
   },
   quickAction: {
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   quickActionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surfaceLight,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   quickActionLabel: {
     color: Colors.textMuted,
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
+    fontSize: Typography.sizes['2xs'],
+    fontWeight: Typography.weights.semibold,
+    letterSpacing: 0.3,
   },
   section: {
     marginTop: Spacing['2xl'],
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   emailBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.md,
     marginTop: Spacing.lg,
-    marginHorizontal: Spacing.lg,
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    marginHorizontal: Spacing.xl,
+    backgroundColor: Colors.warningMuted,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: 'rgba(255, 184, 0, 0.15)',
     borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
+    padding: Spacing.lg,
   },
   emailBannerText: {
     flex: 1,
   },
   emailBannerTitle: {
-    color: '#F59E0B',
+    color: Colors.warning,
     fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
+    fontWeight: Typography.weights.bold,
   },
   emailBannerSub: {
     color: Colors.textMuted,
     fontSize: Typography.sizes.xs,
-    marginTop: 1,
+    marginTop: 2,
   },
   sectionTitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
+    color: Colors.textMuted,
+    fontSize: Typography.sizes['2xs'],
+    fontWeight: Typography.weights.bold,
     textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    letterSpacing: 1.5,
     marginBottom: Spacing.md,
   },
   infoCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   infoRow: {
     flexDirection: 'row',
@@ -509,10 +527,10 @@ const styles = StyleSheet.create({
   infoLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   infoLabel: {
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     fontSize: Typography.sizes.sm,
   },
   infoValue: {
@@ -524,6 +542,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   menuItem: {
     flexDirection: 'row',
@@ -542,31 +562,32 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   menuItemIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: Colors.surfaceLight,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   menuItemLabel: {
     color: Colors.textPrimary,
     fontSize: Typography.sizes.md,
-    fontWeight: Typography.weights.medium,
+    fontWeight: Typography.weights.semibold,
   },
   menuItemSubtitle: {
     color: Colors.textMuted,
     fontSize: Typography.sizes.xs,
-    marginTop: 1,
+    marginTop: 2,
   },
   actions: {
     marginTop: Spacing['3xl'],
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   version: {
     color: Colors.textMuted,
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes['2xs'],
     textAlign: 'center',
     marginTop: Spacing['2xl'],
+    letterSpacing: 0.5,
   },
 });

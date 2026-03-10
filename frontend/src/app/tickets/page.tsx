@@ -10,6 +10,7 @@ import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { CardSkeleton } from '@/components/Skeleton';
 import { EmptyState } from '@/components/EmptyState';
+import { PageHeader } from '@/components/PageHeader';
 import { ticketsApi } from '@/lib/api';
 import { BLOCK_EXPLORER } from '@/lib/constants';
 import { useAuthStore } from '@/lib/store';
@@ -117,18 +118,16 @@ export default function MyTicketsPage() {
           {/* Header + Stats */}
           <div className="mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-              <div>
-                <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Collection</span>
-                <h1 className="mt-2 text-4xl font-extrabold">
-                  My{' '}
-                  <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Tickets</span>
-                </h1>
-                <p className="mt-1 text-muted">
-                  {tickets.length > 0
+              <PageHeader
+                category="Collection"
+                title="My"
+                highlight="Tickets"
+                description={
+                  tickets.length > 0
                     ? `${tickets.length} NFT ticket${tickets.length !== 1 ? 's' : ''} in your collection`
-                    : 'Your NFT ticket collection'}
-                </p>
-              </div>
+                    : 'Your NFT ticket collection'
+                }
+              />
               <Button variant="outline" onClick={loadTickets} size="sm">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1.5"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
                 Refresh

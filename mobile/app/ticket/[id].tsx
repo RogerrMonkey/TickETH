@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   ScrollView,
   Linking,
   RefreshControl,
-  Animated,
   TouchableOpacity,
 } from 'react-native';
+import ReAnimated from 'react-native-reanimated';
+import { useFadeIn } from '../../src/utils/animations';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,7 +51,7 @@ export default function TicketDetailScreen() {
   const { qrPayload, loading: qrLoading, error: qrError, refresh: refreshQR } = useTicketQR(id, eventId);
   const { joinTicket } = useCheckin();
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const contentStyle = useFadeIn(ticket ? 0 : 99999);
 
   useEffect(() => {
     analytics.screenView('ticket_detail');
@@ -62,16 +63,6 @@ export default function TicketDetailScreen() {
       joinTicket(id);
     }
   }, [id, ticket?.status, joinTicket]);
-
-  useEffect(() => {
-    if (ticket) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [ticket]);
 
   const handleRefresh = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -142,13 +133,19 @@ export default function TicketDetailScreen() {
           />
         }
       >
-        <Animated.View style={{ opacity: fadeAnim }}>
+        <ReAnimated.View style={contentStyle}>
           {/* Event info header */}
           <View style={styles.eventHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.eventTitle} accessibilityRole="header">
+              <Text style={styles.eventTitle} accessibilityRole="header" numberOfLines={2}>
                 {ticket.event?.title ?? 'Event'}
               </Text>
+              {ticket.tier?.name && (
+                <View style={styles.tierBadge}>
+                  <Ionicons name="ribbon-outline" size={12} color={Colors.accent} />
+                  <Text style={styles.tierBadgeText}>{ticket.tier.name}</Text>
+                </View>
+              )}
               {isExpired && !isCheckedIn && (
                 <View style={styles.expiredBadge}>
                   <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
@@ -223,7 +220,7 @@ export default function TicketDetailScreen() {
             <DetailRow label="Token ID" value={`#${ticket.token_id}`} />
             <DetailRow label="Tier" value={ticket.tier?.name ?? '—'} />
             {ticket.tier?.price && (
-              <DetailRow label="Price" value={formatPrice(ticket.tier.price)} />
+              <DetailRow label="Price" value={formatPrice(ticket.tier.price_wei)} />
             )}
             <DetailRow label="Owner" value={shortenAddress(ticket.owner_wallet)} />
             <DetailRow
@@ -276,7 +273,7 @@ export default function TicketDetailScreen() {
               />
             </View>
           )}
-        </Animated.View>
+        </ReAnimated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -322,7 +319,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing['6xl'],
   },
   eventHeader: {
@@ -333,20 +330,46 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     color: Colors.textPrimary,
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
+    fontSize: Typography.sizes['2xl'],
+    fontWeight: Typography.weights.extrabold,
     flex: 1,
     marginRight: Spacing.md,
+    letterSpacing: -0.3,
+    lineHeight: 30,
+  },
+  tierBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    backgroundColor: Colors.accentMuted,
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.15)',
+  },
+  tierBadgeText: {
+    color: Colors.accent,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.bold,
   },
   expiredBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 4,
+    marginTop: 6,
+    backgroundColor: Colors.warningMuted,
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
   },
   expiredText: {
-    color: Colors.textMuted,
+    color: Colors.warning,
     fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.medium,
   },
   qrSection: {
     alignItems: 'center',
@@ -355,21 +378,25 @@ const styles = StyleSheet.create({
   refreshQRButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     marginTop: Spacing.md,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   refreshQRText: {
     color: Colors.primary,
     fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
+    fontWeight: Typography.weights.semibold,
   },
   statusCard: {
     marginBottom: Spacing.lg,
-    backgroundColor: 'rgba(245,158,11,0.1)',
+    backgroundColor: Colors.warningMuted,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.15)',
   },
   statusCardContent: {
     flexDirection: 'row',
@@ -387,7 +414,9 @@ const styles = StyleSheet.create({
   },
   checkedInCard: {
     marginBottom: Spacing.lg,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: Colors.successMuted,
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.15)',
   },
   detailsCard: {
     marginBottom: Spacing.xl,
@@ -396,10 +425,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    minHeight: 44,
+    minHeight: 48,
   },
   detailLabel: {
     color: Colors.textMuted,

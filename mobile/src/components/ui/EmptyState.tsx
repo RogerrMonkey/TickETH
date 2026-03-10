@@ -44,10 +44,12 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.glass,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   title: {
     color: Colors.textPrimary,

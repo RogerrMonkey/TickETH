@@ -9,12 +9,12 @@ export const API_BASE_URL =
     ? 'http://192.168.0.234:3001/api/v1'   // LAN IP -> host machine
     : 'https://api.ticketh.io/api/v1');
 
-/** Thirdweb client — uses clientId from Expo config or fallback */
+/** Thirdweb client — uses clientId from Expo config */
 export const THIRDWEB_CLIENT_ID =
-  Constants.expoConfig?.extra?.thirdwebClientId ?? '98ae3d982a02db9fa69f6aeec72166e2';
+  Constants.expoConfig?.extra?.thirdwebClientId ?? '';
 
 export const thirdwebClient = createThirdwebClient({
-  clientId: THIRDWEB_CLIENT_ID,
+  clientId: THIRDWEB_CLIENT_ID || '98ae3d982a02db9fa69f6aeec72166e2',
 });
 
 /** Active chain for the app */
@@ -33,15 +33,16 @@ export const CHAIN_CONFIG = {
   },
 } as const;
 
-/** Deployed contract addresses (Polygon Amoy) */
+/** Deployed contract addresses (Polygon Amoy) — from env or dev defaults */
 export const CONTRACTS = {
-  factory: '0x8E0237fed96693c36c5A5021A6893b7B9F3494B2',
-  marketplace: '0x828bE7efB199b867684bE502A8e93F817697a543',
-  implementation: '0x164d162Da6edF739A0bCd610FBd5d808c165870e',
+  factory: Constants.expoConfig?.extra?.factoryAddress ?? '0x8E0237fed96693c36c5A5021A6893b7B9F3494B2',
+  marketplace: Constants.expoConfig?.extra?.marketplaceAddress ?? '0x828bE7efB199b867684bE502A8e93F817697a543',
+  implementation: Constants.expoConfig?.extra?.implementationAddress ?? '0x164d162Da6edF739A0bCd610FBd5d808c165870e',
 } as const;
 
 /** WalletConnect project ID — get one at https://cloud.walletconnect.com */
-export const WALLETCONNECT_PROJECT_ID = 'YOUR_WALLETCONNECT_PROJECT_ID';
+export const WALLETCONNECT_PROJECT_ID =
+  Constants.expoConfig?.extra?.walletConnectProjectId ?? '';
 
 /** QR code refresh interval (ms) — refresh nonce every 25 seconds */
 export const QR_REFRESH_INTERVAL = 25_000;

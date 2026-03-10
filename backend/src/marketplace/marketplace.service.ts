@@ -32,46 +32,60 @@ export class MarketplaceService {
     const ticket = await this.tickets.findById(dto.ticketId);
     if (!ticket) throw new NotFoundException('Ticket not found');
 
-    if (ticket.status === TicketStatus.CHECKED_IN) {
-      throw new BadRequestException('Checked-in tickets cannot be listed');
-    }
-    if (ticket.status === TicketStatus.INVALIDATED) {
-      throw new BadRequestException('Invalidated tickets cannot be listed');
-    }
-    if (ticket.status === TicketStatus.LISTED) {
-      throw new BadRequestException('Ticket is already listed');
+    const unlistableStatuses = [TicketStatus.CHECKED_IN, TicketStatus.INVALIDATED, TicketStatus.LISTED];
+    if (unlistableStatuses.includes(ticket.status as TicketStatus)) {
+      throw new BadRequestException(`Ticket with status '${ticket.status}' cannot be listed`);
     }
 
-    // Resolve fields from the ticket record
-    const eventId = ticket.event_id;
-    const tierId = ticket.tier_id;
-    const contractAddress = ticket.contract_address;
-    const tokenId = ticket.token_id;
-    const sellerWallet = ticket.owner_wallet;
+    const { event_id: eventId, tier_id: tierId, contract_address: contractAddress, token_id: tokenId, owner_wallet: sellerWallet } = ticket;
 
-    // Check tier allows resale
-    const { data: tier } = await this.supabase.admin
-      .from('ticket_tiers')
-      .select('resale_allowed, max_resales, max_price_deviation_bps, price, price_wei')
-      .eq('id', tierId)
-      .single();
+    // Fetch tier and event in parallel
+    const [tierResult, eventResult] = await Promise.all([
+      this.supabase.admin
+        .from('ticket_tiers')
+        .select('resale_allowed, max_resales, max_price_deviation_bps, price, price_wei')
+        .eq('id', tierId)
+        .single(),
+      this.supabase.admin
+        .from('events')
+        .select('start_time')
+        .eq('id', eventId)
+        .single(),
+    ]);
 
+    const tier = tierResult.data;
     if (!tier) throw new NotFoundException('Tier not found');
     if (!tier.resale_allowed) {
       throw new BadRequestException('Resale is not allowed for this tier');
     }
-
-    // Check resale limit
     if (tier.max_resales > 0 && ticket.transfer_count >= tier.max_resales) {
-      throw new BadRequestException(
-        `Resale limit reached (${tier.max_resales} max)`,
-      );
+      throw new BadRequestException(`Resale limit reached (${tier.max_resales} max)`);
+    }
+
+    const event = eventResult.data;
+    if (event?.start_time && new Date(event.start_time) <= new Date()) {
+      throw new BadRequestException('Cannot list tickets for events that have already started');
     }
 
     // Resolve prices
     const askingPrice = dto.askingPrice ?? 0;
     const originalPrice = tier.price ?? 0;
     const originalPriceWei = tier.price_wei ?? '0';
+
+    // Check price deviation cap
+    if (tier.max_price_deviation_bps > 0 && originalPriceWei !== '0') {
+      const asking = BigInt(dto.askingPriceWei);
+      const original = BigInt(originalPriceWei);
+      const deviationBps = BigInt(tier.max_price_deviation_bps);
+      const minPrice = original - (original * deviationBps) / 10000n;
+      const maxPrice = original + (original * deviationBps) / 10000n;
+
+      if (asking < minPrice || asking > maxPrice) {
+        throw new BadRequestException(
+          `Asking price must be within ${tier.max_price_deviation_bps / 100}% of original price`,
+        );
+      }
+    }
 
     // Create the listing
     const { data: listing, error } = await this.supabase.admin
@@ -130,7 +144,7 @@ export class MarketplaceService {
       throw new BadRequestException('Listing is not active');
     }
 
-    // Update listing to sold
+    // Atomically claim the listing (prevents double-sale via optimistic lock)
     const { data: updatedListing, error: listingError } = await this.supabase.admin
       .from('marketplace_listings')
       .update({
@@ -142,48 +156,52 @@ export class MarketplaceService {
         seller_proceeds_wei: dto.sellerProceedsWei ?? '0',
       })
       .eq('id', dto.listingId)
+      .eq('status', ListingStatus.ACTIVE) // Optimistic lock — only update if still active
       .select('*')
       .single();
 
-    if (listingError) throw listingError;
+    if (listingError || !updatedListing) {
+      throw new BadRequestException('Listing already sold or cancelled');
+    }
 
-    // Get current ticket to compute resale number
-    const ticket = await this.tickets.findById(listing.ticket_id);
-    const resaleNumber = (ticket?.transfer_count ?? 0) + 1;
+    const resaleNumber = (listing.tickets?.transfer_count ?? 0) + 1;
 
-    // Update ticket: new owner, increment transfer_count, status
-    const { error: ticketError } = await this.supabase.admin
-      .from('tickets')
-      .update({
-        owner_wallet: dto.buyerWallet.toLowerCase(),
-        status: TicketStatus.TRANSFERRED,
-        transferred_at: new Date().toISOString(),
-        transfer_count: resaleNumber,
-      })
-      .eq('id', listing.ticket_id);
+    // Update ticket and create resale history
+    const [ticketResult, historyResult] = await Promise.all([
+      this.supabase.admin
+        .from('tickets')
+        .update({
+          owner_wallet: dto.buyerWallet.toLowerCase(),
+          status: TicketStatus.TRANSFERRED,
+          transferred_at: new Date().toISOString(),
+          transfer_count: resaleNumber,
+        })
+        .eq('id', listing.ticket_id),
+      this.supabase.admin
+        .from('resale_history')
+        .insert({
+          listing_id: dto.listingId,
+          ticket_id: listing.ticket_id,
+          event_id: listing.event_id,
+          token_id: listing.token_id,
+          contract_address: listing.contract_address,
+          seller_wallet: listing.seller_wallet,
+          buyer_wallet: dto.buyerWallet.toLowerCase(),
+          sale_price_wei: listing.asking_price_wei,
+          original_price_wei: listing.original_price_wei,
+          platform_fee_wei: dto.platformFeeWei ?? '0',
+          seller_proceeds_wei: dto.sellerProceedsWei ?? '0',
+          resale_number: resaleNumber,
+          tx_hash: dto.txHash,
+        }),
+    ]);
 
-    if (ticketError) throw ticketError;
-
-    // Create resale history record
-    const { error: historyError } = await this.supabase.admin
-      .from('resale_history')
-      .insert({
-        listing_id: dto.listingId,
-        ticket_id: listing.ticket_id,
-        event_id: listing.event_id,
-        token_id: listing.token_id,
-        contract_address: listing.contract_address,
-        seller_wallet: listing.seller_wallet,
-        buyer_wallet: dto.buyerWallet.toLowerCase(),
-        sale_price_wei: listing.asking_price_wei,
-        original_price_wei: listing.original_price_wei,
-        platform_fee_wei: dto.platformFeeWei ?? '0',
-        seller_proceeds_wei: dto.sellerProceedsWei ?? '0',
-        resale_number: resaleNumber,
-        tx_hash: dto.txHash,
-      });
-
-    if (historyError) throw historyError;
+    if (ticketResult.error) {
+      this.logger.error(`Failed to update ticket after sale: ${ticketResult.error.message}`);
+    }
+    if (historyResult.error) {
+      this.logger.error(`Failed to create resale history: ${historyResult.error.message}`);
+    }
 
     await this.audit.log({
       actorWallet: dto.buyerWallet.toLowerCase(),

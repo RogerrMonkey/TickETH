@@ -16,6 +16,7 @@ import { useCopyToClipboard, useRequireAuth } from '@/lib/hooks';
 import { parseError } from '@/lib/error-parser';
 import { toast } from 'sonner';
 import { ImageUpload } from '@/components/ImageUpload';
+import { PageHeader } from '@/components/PageHeader';
 
 /** Simple email regex */
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -131,15 +132,7 @@ export default function ProfilePage() {
 
       <main className="flex-1 px-4 py-10">
         <div className="mx-auto max-w-2xl">
-          {/* Header */}
-          <div className="mb-8">
-            <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Account</span>
-            <h1 className="mt-2 text-4xl font-extrabold">
-              My{' '}
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Profile</span>
-            </h1>
-            <p className="mt-1 text-muted">Manage your account details and preferences</p>
-          </div>
+          <PageHeader category="Account" title="My" highlight="Profile" description="Manage your account details and preferences" />
 
           {/* Email missing prompt */}
           <AnimatePresence>

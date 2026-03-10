@@ -9,6 +9,7 @@ import { createHmac, randomBytes } from 'crypto';
 import Redis from 'ioredis';
 import { SupabaseService } from '../common/supabase/supabase.service';
 import { TicketsService } from '../tickets/tickets.service';
+import { EventsService } from '../events/events.service';
 import { AuditService } from '../audit/audit.service';
 import { CheckinGateway } from './checkin.gateway';
 import { CheckinResult, TicketStatus, AuditAction } from '../common/enums';
@@ -56,6 +57,7 @@ export class CheckinService {
     private readonly config: ConfigService,
     private readonly supabase: SupabaseService,
     private readonly tickets: TicketsService,
+    private readonly events: EventsService,
     private readonly audit: AuditService,
     private readonly gateway: CheckinGateway,
   ) {}
@@ -203,6 +205,56 @@ export class CheckinService {
         ticketId: dto.ticketId,
         message: 'Invalid ticket.',
       };
+    }
+
+    // 4b. Validate check-in time window (2h before start → 30min before end)
+    if (!dto.offlineSync) {
+      try {
+        const event = await this.events.findById(dto.eventId);
+        const now = Date.now();
+        const startTime = event.start_time ? new Date(event.start_time).getTime() : null;
+        const endTime = event.end_time ? new Date(event.end_time).getTime() : null;
+
+        const WINDOW_BEFORE_START_MS = 2 * 60 * 60 * 1000; // 2 hours
+        const WINDOW_BEFORE_END_MS = 30 * 60 * 1000;       // 30 minutes
+
+        if (startTime && now < startTime - WINDOW_BEFORE_START_MS) {
+          const logId = await this.createCheckinLog({
+            ticketId: dto.ticketId,
+            eventId: dto.eventId,
+            volunteerId,
+            nonce: dto.nonce,
+            result: CheckinResult.FAILED_INVALID_TICKET,
+            offlineSync: false,
+          });
+          return {
+            checkinLogId: logId,
+            result: CheckinResult.FAILED_INVALID_TICKET,
+            ticketId: dto.ticketId,
+            message: 'Check-in is not yet open. It opens 2 hours before the event starts.',
+          };
+        }
+
+        if (endTime && now > endTime - WINDOW_BEFORE_END_MS) {
+          const logId = await this.createCheckinLog({
+            ticketId: dto.ticketId,
+            eventId: dto.eventId,
+            volunteerId,
+            nonce: dto.nonce,
+            result: CheckinResult.FAILED_INVALID_TICKET,
+            offlineSync: false,
+          });
+          return {
+            checkinLogId: logId,
+            result: CheckinResult.FAILED_INVALID_TICKET,
+            ticketId: dto.ticketId,
+            message: 'Check-in has closed. It closes 30 minutes before the event ends.',
+          };
+        }
+      } catch {
+        // If event lookup fails, proceed — don't block check-in for a DB error
+        this.logger.warn(`Could not validate check-in time window for event ${dto.eventId}`);
+      }
     }
 
     // 5. Check if already checked in

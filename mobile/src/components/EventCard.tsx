@@ -2,8 +2,10 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import Animated from 'react-native-reanimated';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { Badge } from './ui/Badge';
+import { useScalePress, useAnimatedProgress } from '../utils/animations';
 import { formatDate, hasEventStarted, isEventSoon, formatPrice } from '../utils/format';
 import type { TickETHEvent } from '../types';
 
@@ -12,16 +14,28 @@ interface EventCardProps {
   onPress: () => void;
 }
 
-export function EventCard({ event, onPress }: EventCardProps) {
+export const EventCard = React.memo(function EventCard({ event, onPress }: EventCardProps) {
   const started = hasEventStarted(event.start_time);
   const soon = isEventSoon(event.start_time);
+  const { onPressIn, onPressOut, animatedStyle: scaleStyle } = useScalePress(0.97);
   const lowestPrice = event.tiers?.reduce<string | null>((lowest, tier) => {
-    if (!lowest) return tier.price;
-    return BigInt(tier.price) < BigInt(lowest) ? tier.price : lowest;
+    if (!lowest) return tier.price_wei;
+    return BigInt(tier.price_wei || '0') < BigInt(lowest) ? tier.price_wei : lowest;
   }, null);
 
+  const soldPercent = event.tickets_sold !== undefined && event.total_tickets
+    ? Math.min((event.tickets_sold / Math.max(event.total_tickets, 1)) * 100, 100)
+    : 0;
+  const progressStyle = useAnimatedProgress(soldPercent, 500);
+
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.container}>
+    <Animated.View style={[styles.container, scaleStyle]}>
+    <TouchableOpacity
+      activeOpacity={0.95}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+    >
       {/* Banner */}
       <View style={styles.bannerWrapper}>
         {event.banner_url ? (
@@ -79,17 +93,7 @@ export function EventCard({ event, onPress }: EventCardProps) {
         {event.tickets_sold !== undefined && event.total_tickets !== undefined && (
           <View style={styles.ticketInfo}>
             <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${Math.min(
-                      (event.tickets_sold / Math.max(event.total_tickets, 1)) * 100,
-                      100,
-                    )}%`,
-                  },
-                ]}
-              />
+              <Animated.View style={[styles.progressFill, progressStyle]} />
             </View>
             <View style={styles.ticketMeta}>
               <Text style={styles.ticketCount}>
@@ -106,23 +110,26 @@ export function EventCard({ event, onPress }: EventCardProps) {
         )}
       </View>
     </TouchableOpacity>
+    </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     overflow: 'hidden',
-    ...Shadows.md,
+    ...Shadows.card,
     marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   bannerWrapper: {
     position: 'relative',
   },
   banner: {
     width: '100%',
-    height: 160,
+    height: 170,
   },
   bannerPlaceholder: {
     backgroundColor: Colors.surfaceLight,
@@ -131,8 +138,8 @@ const styles = StyleSheet.create({
   },
   badgeOverlay: {
     position: 'absolute',
-    top: Spacing.sm,
-    right: Spacing.sm,
+    top: Spacing.md,
+    right: Spacing.md,
   },
   content: {
     padding: Spacing.lg,
@@ -142,14 +149,15 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
     marginBottom: Spacing.sm,
+    letterSpacing: -0.2,
   },
   meta: {
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   metaText: {
     color: Colors.textSecondary,
@@ -160,11 +168,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
   },
   progressBar: {
-    height: 4,
+    height: 3,
     backgroundColor: Colors.surfaceLight,
     borderRadius: 2,
     overflow: 'hidden',
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   progressFill: {
     height: '100%',
@@ -183,20 +191,22 @@ const styles = StyleSheet.create({
   ticketWarning: {
     color: Colors.warning,
     fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
+    fontWeight: Typography.weights.bold,
   },
   priceTag: {
     position: 'absolute',
-    bottom: Spacing.sm,
-    left: Spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    paddingHorizontal: Spacing.sm,
+    bottom: Spacing.md,
+    left: Spacing.md,
+    backgroundColor: 'rgba(8, 8, 15, 0.85)',
+    paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   priceText: {
     color: Colors.textPrimary,
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.bold,
   },
 });

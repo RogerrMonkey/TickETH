@@ -2,32 +2,65 @@ import {
   Injectable,
   UnauthorizedException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { SiweMessage, generateNonce } from 'siwe';
+import Redis from 'ioredis';
 import { UsersService } from '../users/users.service';
 import { JwtPayload } from '../common/interfaces';
-import { UserRole } from '../common/enums';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
+  private static readonly NONCE_TTL_SECS = 300; // 5 minutes
   private readonly logger = new Logger(AuthService.name);
-  // In production, use Redis for nonce storage with TTL
-  private readonly nonces = new Map<string, { nonce: string; expiresAt: number }>();
+  private redis: Redis | null = null;
+  // Fallback in-memory store (only when Redis unavailable)
+  private readonly noncesFallback = new Map<string, { nonce: string; expiresAt: number }>();
 
   constructor(
     private readonly jwt: JwtService,
     private readonly users: UsersService,
+    private readonly config: ConfigService,
   ) {}
 
+  onModuleInit() {
+    try {
+      this.redis = new Redis({
+        host: this.config.get<string>('REDIS_HOST', 'localhost'),
+        port: this.config.get<number>('REDIS_PORT', 6379),
+        password: this.config.get<string>('REDIS_PASSWORD') || undefined,
+        keyPrefix: 'ticketh:auth:nonce:',
+        maxRetriesPerRequest: 3,
+        lazyConnect: true,
+      });
+      this.redis.connect().then(() => {
+        this.logger.log('Auth nonce Redis connected');
+      }).catch((err) => {
+        this.logger.warn(`Auth Redis failed — using in-memory fallback: ${err.message}`);
+        this.redis = null;
+      });
+    } catch {
+      this.logger.warn('Auth Redis unavailable — using in-memory fallback');
+      this.redis = null;
+    }
+  }
+
   /** Generate a nonce for SIWE. Keyed by wallet address. */
-  getNonce(walletAddress: string): { nonce: string } {
+  async getNonce(walletAddress: string): Promise<{ nonce: string }> {
     const nonce = generateNonce();
     const address = walletAddress.toLowerCase();
-    this.nonces.set(address, {
-      nonce,
-      expiresAt: Date.now() + 5 * 60 * 1000, // 5 min TTL
-    });
+
+    if (this.redis) {
+      await this.redis.set(address, nonce, 'EX', AuthService.NONCE_TTL_SECS);
+    } else {
+      this.noncesFallback.set(address, {
+        nonce,
+        expiresAt: Date.now() + AuthService.NONCE_TTL_SECS * 1000,
+      });
+    }
+
     return { nonce };
   }
 
@@ -42,16 +75,22 @@ export class AuthService {
 
     const address = siweMessage.address.toLowerCase();
 
-    // Validate nonce
-    const stored = this.nonces.get(address);
-    if (!stored) {
-      throw new UnauthorizedException('Nonce not found — call /auth/nonce first');
+    // Validate nonce from Redis (or fallback)
+    let storedNonce: string | null = null;
+    if (this.redis) {
+      storedNonce = await this.redis.get(address);
+    } else {
+      const entry = this.noncesFallback.get(address);
+      if (entry && Date.now() <= entry.expiresAt) {
+        storedNonce = entry.nonce;
+      }
+      this.noncesFallback.delete(address);
     }
-    if (Date.now() > stored.expiresAt) {
-      this.nonces.delete(address);
-      throw new UnauthorizedException('Nonce expired');
+
+    if (!storedNonce) {
+      throw new UnauthorizedException('Nonce not found or expired — call /auth/nonce first');
     }
-    if (stored.nonce !== siweMessage.nonce) {
+    if (storedNonce !== siweMessage.nonce) {
       throw new UnauthorizedException('Nonce mismatch');
     }
 
@@ -63,7 +102,9 @@ export class AuthService {
     }
 
     // Consume nonce (single-use)
-    this.nonces.delete(address);
+    if (this.redis) {
+      await this.redis.del(address);
+    }
 
     // Upsert user
     let user = await this.users.findByWallet(address);

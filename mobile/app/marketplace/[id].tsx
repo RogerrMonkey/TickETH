@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Alert,
-  Animated,
   Linking,
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
+import ReAnimated from 'react-native-reanimated';
+import { useFadeIn } from '../../src/utils/animations';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,8 +41,7 @@ export default function ListingDetailScreen() {
   const [purchased, setPurchased] = useState(false);
   const [cancelled, setCancelled] = useState(false);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
+  const contentStyle = useFadeIn(loading ? 99999 : 0);
 
   const fetchListing = useCallback(async () => {
     if (!id) return;
@@ -54,10 +54,6 @@ export default function ListingDetailScreen() {
       showToast({ type: 'error', title: 'Load Failed', message: parsed.message });
     } finally {
       setLoading(false);
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
-      ]).start();
     }
   }, [id]);
 
@@ -154,7 +150,7 @@ export default function ListingDetailScreen() {
       <SafeAreaView style={styles.container}>
         <ConfettiAnimation />
         <View style={styles.resultContainer}>
-          <View style={[styles.resultIcon, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
+          <View style={[styles.resultIcon, { backgroundColor: Colors.successMuted }]}>
             <Ionicons name="bag-check" size={80} color={Colors.success} />
           </View>
           <Text style={styles.resultTitle}>Ticket Purchased!</Text>
@@ -186,7 +182,7 @@ export default function ListingDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.resultContainer}>
-          <View style={[styles.resultIcon, { backgroundColor: 'rgba(239,68,68,0.12)' }]}>
+          <View style={[styles.resultIcon, { backgroundColor: Colors.errorMuted }]}>
             <Ionicons name="close-circle" size={80} color={Colors.error} />
           </View>
           <Text style={styles.resultTitle}>Listing Cancelled</Text>
@@ -257,7 +253,7 @@ export default function ListingDetailScreen() {
           />
         }
       >
-        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+        <ReAnimated.View style={contentStyle}>
           {/* Event Info Card */}
           <Card variant="elevated" style={styles.eventCard}>
             <View style={styles.eventHeader}>
@@ -378,7 +374,7 @@ export default function ListingDetailScreen() {
               </Text>
             </Card>
           )}
-        </Animated.View>
+        </ReAnimated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -420,7 +416,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing['6xl'],
   },
   eventCard: {
@@ -435,29 +431,33 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
+    letterSpacing: -0.3,
   },
   eventTier: {
     color: Colors.textMuted,
     fontSize: Typography.sizes.sm,
-    marginTop: 2,
+    marginTop: 3,
   },
   priceCard: {
     alignItems: 'center',
     paddingVertical: Spacing['2xl'],
     marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   priceLabel: {
     color: Colors.textMuted,
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes['2xs'],
+    fontWeight: Typography.weights.bold,
     textTransform: 'uppercase',
-    letterSpacing: 1.5,
+    letterSpacing: 2,
   },
   priceValue: {
     color: Colors.primary,
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: Typography.weights.extrabold,
     marginTop: Spacing.xs,
+    letterSpacing: -0.5,
   },
   priceSubtext: {
     color: Colors.textMuted,
@@ -468,18 +468,18 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   sectionTitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
+    color: Colors.textMuted,
+    fontSize: Typography.sizes['2xs'],
+    fontWeight: Typography.weights.bold,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     marginBottom: Spacing.md,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: Spacing.sm + 2,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -499,11 +499,15 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     paddingVertical: Spacing.md,
     marginBottom: Spacing.xl,
+    backgroundColor: Colors.glass,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   explorerText: {
     color: Colors.primary,
     fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
+    fontWeight: Typography.weights.semibold,
   },
   actions: {
     gap: Spacing.md,
@@ -515,11 +519,14 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     marginTop: Spacing.xl,
     padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   inactiveText: {
     color: Colors.textSecondary,
     fontSize: Typography.sizes.sm,
     flex: 1,
+    lineHeight: 20,
   },
   resultContainer: {
     flex: 1,
@@ -540,11 +547,13 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes['2xl'],
     fontWeight: Typography.weights.extrabold,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
   resultMessage: {
     color: Colors.textSecondary,
     fontSize: Typography.sizes.md,
     textAlign: 'center',
     marginTop: Spacing.sm,
+    lineHeight: 22,
   },
 });

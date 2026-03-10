@@ -71,3 +71,11 @@ export enum ListingStatus {
   SOLD = 'sold',
   CANCELLED = 'cancelled',
 }
+
+/** Support ticket status */
+export enum SupportTicketStatus {
+  OPEN = 'open',
+  IN_PROGRESS = 'in_progress',
+  RESOLVED = 'resolved',
+  CLOSED = 'closed',
+}

@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated from 'react-native-reanimated';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { Badge } from './ui/Badge';
+import { useScalePress } from '../utils/animations';
 import { formatDate, formatPrice, formatTicketStatus } from '../utils/format';
 import type { Ticket, TicketStatus } from '../types';
 
@@ -19,14 +21,31 @@ const statusVariant: Record<TicketStatus, 'success' | 'default' | 'warning' | 'i
   invalidated: 'error',
 };
 
-export function TicketCard({ ticket, onPress }: TicketCardProps) {
+const statusColor: Record<TicketStatus, string> = {
+  minted: Colors.success,
+  checked_in: Colors.textMuted,
+  transferred: Colors.warning,
+  listed: Colors.accent,
+  invalidated: Colors.error,
+};
+
+export const TicketCard = React.memo(function TicketCard({ ticket, onPress }: TicketCardProps) {
+  const { onPressIn, onPressOut, animatedStyle: scaleStyle } = useScalePress(0.97);
+
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.container}>
-      {/* Left accent bar */}
+    <Animated.View style={[styles.container, scaleStyle]}>
+    <TouchableOpacity
+      activeOpacity={0.95}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={styles.inner}
+    >
+      {/* Left accent bar with gradient effect */}
       <View
         style={[
           styles.accentBar,
-          { backgroundColor: ticket.status === 'minted' ? Colors.primary : Colors.textMuted },
+          { backgroundColor: statusColor[ticket.status] },
         ]}
       />
 
@@ -47,7 +66,7 @@ export function TicketCard({ ticket, onPress }: TicketCardProps) {
           />
         </View>
 
-        {/* Divider */}
+        {/* Divider with ticket stub cutouts */}
         <View style={styles.divider}>
           <View style={styles.dividerCircleLeft} />
           <View style={styles.dividerLine} />
@@ -57,21 +76,21 @@ export function TicketCard({ ticket, onPress }: TicketCardProps) {
         {/* Bottom row */}
         <View style={styles.bottomRow}>
           <View style={styles.detail}>
-            <Ionicons name="pricetag-outline" size={14} color={Colors.textMuted} />
+            <Ionicons name="pricetag" size={12} color={Colors.textMuted} />
             <Text style={styles.detailText}>#{ticket.token_id}</Text>
           </View>
 
           {ticket.event?.start_time && (
             <View style={styles.detail}>
-              <Ionicons name="calendar-outline" size={14} color={Colors.textMuted} />
+              <Ionicons name="calendar" size={12} color={Colors.textMuted} />
               <Text style={styles.detailText}>{formatDate(ticket.event.start_time)}</Text>
             </View>
           )}
 
-          {ticket.tier?.price && (
+          {ticket.tier?.price_wei && (
             <View style={styles.detail}>
-              <Ionicons name="diamond-outline" size={14} color={Colors.textMuted} />
-              <Text style={styles.detailText}>{formatPrice(ticket.tier.price)}</Text>
+              <Ionicons name="diamond" size={12} color={Colors.primaryLight} />
+              <Text style={[styles.detailText, { color: Colors.primaryLight }]}>{formatPrice(ticket.tier.price_wei)}</Text>
             </View>
           )}
         </View>
@@ -79,20 +98,27 @@ export function TicketCard({ ticket, onPress }: TicketCardProps) {
 
       {/* Arrow */}
       <View style={styles.arrow}>
-        <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+        <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
       </View>
     </TouchableOpacity>
+    </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    ...Shadows.card,
+    marginBottom: Spacing.md,
+  },
+  inner: {
     flexDirection: 'row',
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',
-    ...Shadows.sm,
-    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   accentBar: {
     width: 4,
@@ -114,11 +140,12 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
+    letterSpacing: -0.2,
   },
   tierName: {
     color: Colors.textSecondary,
     fontSize: Typography.sizes.sm,
-    marginTop: 2,
+    marginTop: 3,
   },
   divider: {
     flexDirection: 'row',
@@ -126,11 +153,11 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.md,
   },
   dividerCircleLeft: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: Colors.background,
-    marginLeft: -Spacing.lg - 4, // Extend to edge
+    marginLeft: -Spacing.lg - 4,
   },
   dividerLine: {
     flex: 1,
@@ -141,9 +168,9 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.sm,
   },
   dividerCircleRight: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: Colors.background,
     marginRight: -Spacing.lg,
   },
@@ -159,6 +186,7 @@ const styles = StyleSheet.create({
   detailText: {
     color: Colors.textMuted,
     fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.medium,
   },
   arrow: {
     justifyContent: 'center',

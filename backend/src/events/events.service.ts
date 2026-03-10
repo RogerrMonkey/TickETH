@@ -107,7 +107,7 @@ export class EventsService {
 
     const { data, error, count } = await this.supabase.admin
       .from('events')
-      .select('*', { count: 'exact' })
+      .select('*, tiers:ticket_tiers(*)', { count: 'exact' })
       .eq('organizer_id', organizerId)
       .order('created_at', { ascending: false })
       .range(from, to);
@@ -136,17 +136,25 @@ export class EventsService {
       throw new ForbiddenException('You do not own this event');
     }
 
+    const fieldMap: Record<string, string> = {
+      title: 'title',
+      description: 'description',
+      bannerUrl: 'banner_url',
+      venue: 'venue',
+      venueAddress: 'venue_address',
+      city: 'city',
+      country: 'country',
+      startTime: 'start_time',
+      endTime: 'end_time',
+      maxCapacity: 'max_capacity',
+    };
+
     const updateData: Record<string, any> = {};
-    if (dto.title !== undefined) updateData.title = dto.title;
-    if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.bannerUrl !== undefined) updateData.banner_url = dto.bannerUrl;
-    if (dto.venue !== undefined) updateData.venue = dto.venue;
-    if (dto.venueAddress !== undefined) updateData.venue_address = dto.venueAddress;
-    if (dto.city !== undefined) updateData.city = dto.city;
-    if (dto.country !== undefined) updateData.country = dto.country;
-    if (dto.startTime !== undefined) updateData.start_time = dto.startTime;
-    if (dto.endTime !== undefined) updateData.end_time = dto.endTime;
-    if (dto.maxCapacity !== undefined) updateData.max_capacity = dto.maxCapacity;
+    for (const [dtoKey, dbKey] of Object.entries(fieldMap)) {
+      if ((dto as any)[dtoKey] !== undefined) {
+        updateData[dbKey] = (dto as any)[dtoKey];
+      }
+    }
 
     const { data, error } = await this.supabase.admin
       .from('events')

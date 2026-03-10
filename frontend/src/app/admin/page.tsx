@@ -13,6 +13,7 @@ import { useRequireAuth } from '@/lib/hooks';
 import { adminApi } from '@/lib/api';
 import { parseError } from '@/lib/error-parser';
 import { TiltCard, SpotlightSection } from '@/components/ui/AnimatedElements';
+import { PageHeader } from '@/components/PageHeader';
 import { toast } from 'sonner';
 import type { DashboardStats } from '@/lib/types';
 
@@ -71,13 +72,7 @@ export default function AdminDashboardPage() {
 
       <main className="flex-1 px-4 py-10">
         <div className="mx-auto max-w-7xl">
-          <div className="mb-8">
-            <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Control Panel</span>
-            <h1 className="mt-2 text-4xl font-extrabold">
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Admin</span>{' '}Dashboard
-            </h1>
-            <p className="mt-1 text-muted">Platform overview and management</p>
-          </div>
+          <PageHeader category="Control Panel" title="Dashboard" highlight="Admin" highlightFirst description="Platform overview and management" />
 
           {/* Stats */}
           {loading ? (
@@ -164,6 +159,16 @@ export default function AdminDashboardPage() {
                     <line x1="16" y1="2" x2="16" y2="6" />
                     <line x1="8" y1="2" x2="8" y2="6" />
                     <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                ),
+              },
+              {
+                title: 'Support Tickets',
+                description: 'Manage user support requests and issues',
+                href: '/admin/support',
+                icon: (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-cyan-400">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                 ),
               },

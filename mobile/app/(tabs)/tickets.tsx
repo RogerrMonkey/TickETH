@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -6,9 +6,9 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
-  Animated,
   ScrollView,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +19,7 @@ import { EmptyState } from '../../src/components/ui/EmptyState';
 import { useMyTickets } from '../../src/hooks/useTickets';
 import { TicketCardSkeleton } from '../../src/components/Skeleton';
 import { analytics } from '../../src/services/analytics';
+import { useStaggeredEntrance, useFadeIn } from '../../src/utils/animations';
 import type { TicketStatus, Ticket } from '../../src/types';
 
 type Filter = 'all' | TicketStatus;
@@ -77,28 +78,11 @@ export default function TicketsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
+      {/* Animated Header */}
       <View style={styles.header}>
-        <Text style={styles.subtitle}>Your Collection</Text>
-        <Text style={styles.title} accessibilityRole="header">
-          My Tickets
-        </Text>
+        <AnimatedHeaderText />
         {tickets.length > 0 && (
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Ionicons name="ticket" size={14} color={Colors.primary} />
-              <Text style={styles.statText}>{activeCount} active</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
-              <Text style={styles.statText}>{checkedInCount} used</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statText}>{tickets.length} total</Text>
-            </View>
-          </View>
+          <AnimatedStats activeCount={activeCount} checkedInCount={checkedInCount} totalCount={tickets.length} />
         )}
       </View>
 
@@ -153,6 +137,9 @@ export default function TicketsScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews
           refreshControl={
             <RefreshControl
               refreshing={loading && tickets.length > 0}
@@ -176,7 +163,45 @@ export default function TicketsScreen() {
   );
 }
 
-/** Animated wrapper for staggered fade-in */
+/** Animated header text */
+function AnimatedHeaderText() {
+  const subtitleStyle = useFadeIn(0);
+  const titleStyle = useFadeIn(80);
+
+  return (
+    <>
+      <Animated.Text style={[styles.subtitle, subtitleStyle]}>Your Collection</Animated.Text>
+      <Animated.Text style={[styles.title, titleStyle]} accessibilityRole="header">
+        My Tickets
+      </Animated.Text>
+    </>
+  );
+}
+
+/** Animated stats row */
+function AnimatedStats({ activeCount, checkedInCount, totalCount }: { activeCount: number; checkedInCount: number; totalCount: number }) {
+  const statsStyle = useFadeIn(200);
+
+  return (
+    <Animated.View style={[styles.statsRow, statsStyle]}>
+      <View style={styles.statItem}>
+        <Ionicons name="ticket" size={14} color={Colors.primary} />
+        <Text style={styles.statText}>{activeCount} active</Text>
+      </View>
+      <View style={styles.statDivider} />
+      <View style={styles.statItem}>
+        <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
+        <Text style={styles.statText}>{checkedInCount} used</Text>
+      </View>
+      <View style={styles.statDivider} />
+      <View style={styles.statItem}>
+        <Text style={styles.statText}>{totalCount} total</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+/** Reanimated staggered entrance for list items */
 function AnimatedTicketCard({
   ticket,
   index,
@@ -186,26 +211,7 @@ function AnimatedTicketCard({
   index: number;
   onPress: () => void;
 }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(16)).current;
-
-  useEffect(() => {
-    const delay = Math.min(index * 70, 350);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        delay,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        delay,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+  const animatedStyle = useStaggeredEntrance(index);
 
   // Expiration indicator — check if event has passed
   const isExpired =
@@ -213,12 +219,7 @@ function AnimatedTicketCard({
   const isTransferred = ticket.status === 'transferred';
 
   return (
-    <Animated.View
-      style={{
-        opacity: fadeAnim,
-        transform: [{ translateY: slideAnim }],
-      }}
-    >
+    <Animated.View style={animatedStyle}>
       {(isExpired || isTransferred) && (
         <View style={styles.ticketBadgeRow}>
           {isTransferred && (
@@ -248,24 +249,34 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
   },
   subtitle: {
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
+    letterSpacing: 0.5,
   },
   title: {
     color: Colors.textPrimary,
     fontSize: Typography.sizes['3xl'],
     fontWeight: Typography.weights.extrabold,
+    letterSpacing: -0.5,
+    marginTop: Spacing['2xs'],
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.sm,
-    gap: Spacing.sm,
+    marginTop: Spacing.md,
+    gap: Spacing.md,
+    backgroundColor: Colors.glass,
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   statItem: {
     flexDirection: 'row',
@@ -273,43 +284,48 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   statText: {
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.medium,
   },
   statDivider: {
     width: 1,
-    height: 12,
+    height: 14,
     backgroundColor: Colors.border,
   },
   filters: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
     gap: Spacing.sm,
   },
   filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    gap: 6,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   filterPillActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryMuted,
+    borderColor: Colors.borderActive,
   },
   filterText: {
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
+    fontWeight: Typography.weights.semibold,
   },
   filterTextActive: {
-    color: Colors.textPrimary,
+    color: Colors.primary,
   },
   list: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing['6xl'],
+    paddingTop: Spacing.xs,
   },
   ticketBadgeRow: {
     flexDirection: 'row',
@@ -320,15 +336,17 @@ const styles = StyleSheet.create({
   ticketBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(245,158,11,0.15)',
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: 8,
+    gap: 4,
+    backgroundColor: Colors.warningMuted,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255,184,0,0.15)',
   },
   ticketBadgeText: {
     color: Colors.warning,
-    fontSize: 10,
-    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes['2xs'],
+    fontWeight: Typography.weights.bold,
   },
 });

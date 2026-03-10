@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from './store';
+import { parseError } from './error-parser';
+import { toast } from 'sonner';
+import type { TxStep } from '@/components/TransactionTracker';
 import type { UserRole } from './types';
 
 /* ─── useRequireAuth ──────────────────────────────────── */
@@ -147,4 +150,54 @@ export function useFocusTrap(active: boolean) {
   }, [active]);
 
   return ref;
+}
+
+/* ─── useTransaction ──────────────────────────────────── */
+/**
+ * Manages blockchain transaction UI state (step, hash, error)
+ * and provides a standard `execute` wrapper with toast & error handling.
+ *
+ * Usage:
+ *   const tx = useTransaction();
+ *   <button onClick={() => tx.execute(async (set) => { ... })}>
+ *   <TransactionTracker step={tx.step} txHash={tx.hash} error={tx.error} />
+ */
+export function useTransaction() {
+  const [step, setStep] = useState<TxStep | null>(null);
+  const [hash, setHash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const reset = useCallback(() => {
+    setStep(null);
+    setHash(null);
+    setError(null);
+  }, []);
+
+  const execute = useCallback(
+    async (
+      fn: (helpers: {
+        setStep: (s: TxStep) => void;
+        setHash: (h: string) => void;
+      }) => Promise<void>,
+    ) => {
+      setStep('preparing');
+      setError(null);
+      setHash(null);
+      try {
+        await fn({ setStep, setHash });
+      } catch (err) {
+        const parsed = parseError(err);
+        setStep('error');
+        setError(parsed.message);
+        if (parsed.code === 'USER_REJECTED') {
+          toast('Transaction cancelled');
+        } else {
+          toast.error(parsed.title, { description: parsed.message });
+        }
+      }
+    },
+    [],
+  );
+
+  return { step, hash, error, reset, execute };
 }

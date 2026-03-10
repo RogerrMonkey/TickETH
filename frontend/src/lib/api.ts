@@ -217,3 +217,30 @@ export const uploadsApi = {
       .then((r) => r.data);
   },
 };
+
+/* ════════════════════════════════════════════════════
+   SUPPORT
+   ════════════════════════════════════════════════════ */
+export const supportApi = {
+  getFaq: () =>
+    apiClient.get<any[]>('/support/faq').then((r) => r.data),
+
+  createTicket: (body: { category: string; subject: string; message: string }) =>
+    apiClient.post('/support/tickets', body).then((r) => r.data),
+
+  getMyTickets: (params?: { page?: number; limit?: number }) =>
+    apiClient.get<PaginatedResponse<any>>('/support/tickets/mine', { params }).then((r) => r.data),
+
+  getTicket: (id: string) =>
+    apiClient.get<any>(`/support/tickets/${id}`).then((r) => r.data),
+
+  reply: (ticketId: string, body: { message: string }) =>
+    apiClient.post(`/support/tickets/${ticketId}/reply`, body).then((r) => r.data),
+
+  // Admin
+  listAll: (params?: { page?: number; limit?: number; status?: string }) =>
+    apiClient.get<PaginatedResponse<any>>('/support/admin/tickets', { params }).then((r) => r.data),
+
+  updateStatus: (ticketId: string, status: string) =>
+    apiClient.patch(`/support/admin/tickets/${ticketId}/status`, { status }).then((r) => r.data),
+};

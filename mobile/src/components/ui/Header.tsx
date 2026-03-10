@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
     minHeight: 56,
   },
@@ -78,17 +78,21 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
+    letterSpacing: -0.2,
   },
   subtitle: {
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     fontSize: Typography.sizes.xs,
     marginTop: 2,
   },
   iconButton: {
     width: 40,
     height: 40,
-    borderRadius: BorderRadius.full,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
 });

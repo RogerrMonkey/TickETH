@@ -3,17 +3,22 @@ import {
   Injectable,
   ArgumentMetadata,
 } from '@nestjs/common';
+import sanitizeHtml from 'sanitize-html';
 
 /**
- * Global pipe that sanitizes all string inputs by stripping HTML tags
- * and dangerous characters. Prevents XSS attacks in stored data.
- *
+ * Global pipe that sanitizes all string inputs using sanitize-html.
+ * Strips all HTML tags and dangerous attributes.
  * Applied globally alongside ValidationPipe.
  */
 @Injectable()
 export class SanitizePipe implements PipeTransform {
+  private static readonly sanitizeOptions: sanitizeHtml.IOptions = {
+    allowedTags: [],
+    allowedAttributes: {},
+    disallowedTagsMode: 'recursiveEscape',
+  };
+
   transform(value: any, metadata: ArgumentMetadata) {
-    // Only sanitize body/query/param strings, not internal metadata
     if (metadata.type === 'custom') return value;
     return this.sanitize(value);
   }
@@ -22,7 +27,7 @@ export class SanitizePipe implements PipeTransform {
     if (value === null || value === undefined) return value;
 
     if (typeof value === 'string') {
-      return this.sanitizeString(value);
+      return sanitizeHtml(value, SanitizePipe.sanitizeOptions).replace(/\0/g, '').trim();
     }
 
     if (Array.isArray(value)) {
@@ -38,18 +43,5 @@ export class SanitizePipe implements PipeTransform {
     }
 
     return value;
-  }
-
-  private sanitizeString(input: string): string {
-    return input
-      // Remove HTML tags
-      .replace(/<[^>]*>/g, '')
-      // Remove script-injection patterns
-      .replace(/javascript\s*:/gi, '')
-      .replace(/on\w+\s*=/gi, '')
-      // Remove null bytes
-      .replace(/\0/g, '')
-      // Trim excessive whitespace
-      .trim();
   }
 }

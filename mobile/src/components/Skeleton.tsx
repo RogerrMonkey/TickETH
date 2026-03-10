@@ -1,13 +1,15 @@
 /**
- * Skeleton loading components for BookMyShow-level polish.
+ * Skeleton loading components with Reanimated shimmer.
  *
- * Provides shimmer-animated placeholder shapes that match the layout
- * of real content so the user sees a meaningful preview instantly.
+ * Provides smooth 60fps shimmer-animated placeholder shapes that match
+ * the layout of real content for instant meaningful feedback.
  */
 
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, ViewStyle, Dimensions } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, ViewStyle, Dimensions } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Colors, Spacing, BorderRadius } from '../constants/theme';
+import { useShimmer } from '../utils/animations';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -26,23 +28,7 @@ export function Skeleton({
   borderRadius = BorderRadius.sm,
   style,
 }: SkeletonProps) {
-  const shimmer = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmer, { toValue: 1, duration: 1000, useNativeDriver: true }),
-        Animated.timing(shimmer, { toValue: 0, duration: 1000, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [shimmer]);
-
-  const opacity = shimmer.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
-  });
+  const shimmerStyle = useShimmer();
 
   return (
     <Animated.View
@@ -52,8 +38,8 @@ export function Skeleton({
           height,
           borderRadius,
           backgroundColor: Colors.surfaceLight,
-          opacity,
         },
+        shimmerStyle,
         style,
       ]}
     />
@@ -201,9 +187,11 @@ export function ListSkeleton({
 const skeletonStyles = StyleSheet.create({
   eventCard: {
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   eventContent: {
     padding: Spacing.lg,
@@ -211,9 +199,11 @@ const skeletonStyles = StyleSheet.create({
   ticketCard: {
     flexDirection: 'row',
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   ticketAccent: {
     width: 4,
@@ -229,7 +219,7 @@ const skeletonStyles = StyleSheet.create({
     gap: Spacing.md,
   },
   detailContent: {
-    padding: Spacing.lg,
+    padding: Spacing.xl,
   },
   detailBadges: {
     flexDirection: 'row',
@@ -237,19 +227,23 @@ const skeletonStyles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   profileContainer: {
-    padding: Spacing.lg,
+    padding: Spacing.xl,
   },
   profileCard: {
     alignItems: 'center',
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing['2xl'],
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   listingCard: {
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   listingRow: {
     flexDirection: 'row',

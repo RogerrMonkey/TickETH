@@ -1,9 +1,11 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '../constants/config';
 
 const TOKEN_KEY = 'ticketh_access_token';
 const REFRESH_KEY = 'ticketh_refresh_token';
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 500;
 
 /** Shared Axios instance with auth interceptors */
 export const apiClient = axios.create({
@@ -11,6 +13,26 @@ export const apiClient = axios.create({
   timeout: 15_000,
   headers: { 'Content-Type': 'application/json' },
 });
+
+/* ─── Retry on network/5xx errors ──────────────────────── */
+function isRetryable(error: AxiosError): boolean {
+  if (!error.response) return true; // network error / timeout
+  return error.response.status >= 500;
+}
+
+apiClient.interceptors.response.use(
+  undefined,
+  async (error: AxiosError) => {
+    const config = error.config as InternalAxiosRequestConfig & { _retryCount?: number };
+    if (!config || !isRetryable(error)) return Promise.reject(error);
+
+    config._retryCount = (config._retryCount ?? 0) + 1;
+    if (config._retryCount > MAX_RETRIES) return Promise.reject(error);
+
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * config._retryCount!));
+    return apiClient(config);
+  },
+);
 
 /* ─── Request interceptor: attach JWT ──────────────────── */
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {

@@ -1,10 +1,12 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../common/supabase/supabase.service';
 import { randomUUID } from 'crypto';
+import * as path from 'path';
 
 const BUCKET = 'images';
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif']);
 
 @Injectable()
 export class UploadsService {
@@ -55,8 +57,11 @@ export class UploadsService {
 
     await this.ensureBucket();
 
-    // Generate unique filename
-    const ext = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
+    // Generate unique filename (sanitize extension from original name)
+    const ext = path.extname(file.originalname).replace(/^\./, '').toLowerCase() || 'jpg';
+    if (!ALLOWED_EXT.has(ext)) {
+      throw new BadRequestException(`Unsupported file extension: .${ext}`);
+    }
     const filename = `${folder}/${randomUUID()}.${ext}`;
 
     const { data, error } = await this.supabase.admin.storage

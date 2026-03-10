@@ -43,6 +43,38 @@ export default function CreateListingScreen() {
     (t) => t.status === 'minted' && t.tier?.resale_allowed !== false,
   );
 
+  // Compute price bounds for the selected ticket's tier
+  const priceBounds = React.useMemo(() => {
+    if (!selectedTicket?.tier) return null;
+    const tier = selectedTicket.tier;
+    const originalWei = tier.price_wei;
+    const deviationBps = tier.max_price_deviation_bps;
+    if (!deviationBps || deviationBps === 0 || !originalWei || originalWei === '0') return null;
+
+    const original = BigInt(originalWei);
+    const bps = BigInt(deviationBps);
+    const minWei = original - (original * bps) / 10000n;
+    const maxWei = original + (original * bps) / 10000n;
+    const minPol = Number(minWei) / 1e18;
+    const maxPol = Number(maxWei) / 1e18;
+    return { minPol, maxPol, deviationPct: deviationBps / 100 };
+  }, [selectedTicket]);
+
+  // Resale info for selected ticket
+  const resaleInfo = React.useMemo(() => {
+    if (!selectedTicket?.tier) return null;
+    const maxResales = selectedTicket.tier.max_resales ?? 0;
+    const used = selectedTicket.transfer_count ?? 0;
+    if (maxResales === 0) return { unlimited: true, used, remaining: Infinity };
+    return { unlimited: false, used, remaining: maxResales - used, max: maxResales };
+  }, [selectedTicket]);
+
+  // Check if event has started
+  const eventStarted = React.useMemo(() => {
+    if (!selectedTicket?.event?.start_time) return false;
+    return new Date(selectedTicket.event.start_time) <= new Date();
+  }, [selectedTicket]);
+
   useEffect(() => {
     analytics.screenView('create_listing');
   }, []);
@@ -56,10 +88,12 @@ export default function CreateListingScreen() {
     const num = parseFloat(text);
     if (isNaN(num) || num <= 0) {
       setPriceError('Enter a valid price');
+    } else if (priceBounds && (num < priceBounds.minPol || num > priceBounds.maxPol)) {
+      setPriceError(`Price must be between ${priceBounds.minPol.toFixed(4)} and ${priceBounds.maxPol.toFixed(4)} POL`);
     } else {
       setPriceError(null);
     }
-  }, []);
+  }, [priceBounds]);
 
   const handleCreate = useCallback(async () => {
     if (!selectedTicket || !priceInput || priceError || !account) return;
@@ -69,15 +103,15 @@ export default function CreateListingScreen() {
     setListing(true);
 
     try {
-      // Convert price to wei-like string (simplified: multiply by 1e18)
+      // Convert price to wei string (multiply by 1e18)
       const priceWei = BigInt(Math.round(parseFloat(priceInput) * 1e18)).toString();
 
       // In production this would call the on-chain marketplace contract first
       // For now we record the listing directly
       await marketplaceApi.createListing({
         ticketId: selectedTicket.id,
-        price: priceWei,
-        txHash: '0x' + '0'.repeat(64), // placeholder until on-chain integration
+        askingPriceWei: priceWei,
+        askingPrice: parseFloat(priceInput),
       });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -127,7 +161,8 @@ export default function CreateListingScreen() {
     );
   }
 
-  const canSubmit = selectedTicket && priceInput && !priceError && !listing;
+  const canSubmit = selectedTicket && priceInput && !priceError && !listing && !eventStarted &&
+    (!resaleInfo || resaleInfo.unlimited || resaleInfo.remaining > 0);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -183,7 +218,7 @@ export default function CreateListingScreen() {
                     )}
                     {ticket.tier?.price && (
                       <Text style={styles.ticketOptionPrice}>
-                        Paid: {formatPrice(ticket.tier.price)}
+                        Paid: {formatPrice(ticket.tier.price_wei)}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -196,6 +231,30 @@ export default function CreateListingScreen() {
           {selectedTicket && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>2. Set Resale Price</Text>
+
+              {/* Event started warning */}
+              {eventStarted && (
+                <View style={styles.warningBanner}>
+                  <Ionicons name="warning" size={16} color={Colors.warning} />
+                  <Text style={styles.warningText}>
+                    This event has already started. Listings are blocked.
+                  </Text>
+                </View>
+              )}
+
+              {/* Resale count info */}
+              {resaleInfo && (
+                <View style={styles.infoRow}>
+                  <Ionicons name="repeat" size={14} color={Colors.textMuted} />
+                  <Text style={styles.infoText}>
+                    {resaleInfo.unlimited
+                      ? `Resales: ${resaleInfo.used} (unlimited)`
+                      : `Resales: ${resaleInfo.used}/${resaleInfo.max} used` +
+                        (resaleInfo.remaining === 0 ? ' — limit reached' : ` — ${resaleInfo.remaining} remaining`)}
+                  </Text>
+                </View>
+              )}
+
               <Input
                 placeholder="0.01"
                 value={priceInput}
@@ -206,7 +265,12 @@ export default function CreateListingScreen() {
               />
               {selectedTicket.tier?.price && (
                 <Text style={styles.priceHint}>
-                  Original price: {formatPrice(selectedTicket.tier.price)}
+                  Original price: {formatPrice(selectedTicket.tier.price_wei)}
+                </Text>
+              )}
+              {priceBounds && (
+                <Text style={styles.priceHint}>
+                  Allowed range (±{priceBounds.deviationPct}%): {priceBounds.minPol.toFixed(4)} – {priceBounds.maxPol.toFixed(4)} POL
                 </Text>
               )}
 
@@ -258,18 +322,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing['6xl'],
   },
   section: {
     marginBottom: Spacing.xl,
   },
   sectionTitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
+    color: Colors.textMuted,
+    fontSize: Typography.sizes['2xs'],
+    fontWeight: Typography.weights.bold,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     marginBottom: Spacing.md,
   },
   emptyCard: {
@@ -291,25 +355,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     marginBottom: Spacing.sm,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: Colors.border,
   },
   ticketOptionSelected: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.surfaceHighlight,
+    backgroundColor: Colors.primaryMuted,
   },
   ticketOptionTitle: {
     color: Colors.textPrimary,
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold,
+    letterSpacing: -0.2,
   },
   ticketOptionTier: {
     color: Colors.textMuted,
     fontSize: Typography.sizes.sm,
-    marginTop: 2,
+    marginTop: 3,
   },
   ticketOptionPrice: {
     color: Colors.textMuted,
@@ -321,21 +386,45 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     marginTop: Spacing.sm,
   },
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.warningMuted ?? 'rgba(255,171,0,0.1)',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  warningText: {
+    color: Colors.warning ?? '#FFAB00',
+    fontSize: Typography.sizes.xs,
+    flex: 1,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  infoText: {
+    color: Colors.textMuted,
+    fontSize: Typography.sizes.xs,
+  },
   previewCard: {
     marginTop: Spacing.lg,
   },
   previewTitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
+    color: Colors.textMuted,
+    fontSize: Typography.sizes['2xs'],
+    fontWeight: Typography.weights.bold,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     marginBottom: Spacing.md,
   },
   previewRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -346,7 +435,7 @@ const styles = StyleSheet.create({
   previewValue: {
     color: Colors.textPrimary,
     fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
+    fontWeight: Typography.weights.semibold,
     maxWidth: '60%',
     textAlign: 'right',
   },
@@ -360,7 +449,7 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: 'rgba(16,185,129,0.15)',
+    backgroundColor: Colors.successMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.xl,
@@ -369,11 +458,13 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.sizes['2xl'],
     fontWeight: Typography.weights.extrabold,
+    letterSpacing: -0.3,
   },
   successMessage: {
     color: Colors.textSecondary,
     fontSize: Typography.sizes.md,
     textAlign: 'center',
     marginTop: Spacing.sm,
+    lineHeight: 22,
   },
 });

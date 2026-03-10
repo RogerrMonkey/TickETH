@@ -11,12 +11,12 @@ import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Skeleton, DetailSkeleton } from '@/components/Skeleton';
 import { Modal } from '@/components/Modal';
-import { TransactionTracker, type TxStep } from '@/components/TransactionTracker';
+import { TransactionTracker } from '@/components/TransactionTracker';
 import { eventsApi, tiersApi, ticketsApi } from '@/lib/api';
 import { thirdwebClient, activeChain, BLOCK_EXPLORER } from '@/lib/constants';
 import { formatDate, formatDateTime, formatPrice, getTierPrice, getTierPriceWei, shortenAddress } from '@/lib/utils';
 import { cn } from '@/lib/cn';
-import { useCountdown, useCopyToClipboard } from '@/lib/hooks';
+import { useCountdown, useCopyToClipboard, useTransaction } from '@/lib/hooks';
 import { parseError } from '@/lib/error-parser';
 import { SpotlightSection, GlowBorder } from '@/components/ui/AnimatedElements';
 import { toast } from 'sonner';
@@ -66,9 +66,7 @@ export default function EventDetailPage() {
   const [mintQty, setMintQty] = useState(1);
 
   // Transaction tracking
-  const [txStep, setTxStep] = useState<TxStep | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [txError, setTxError] = useState<string | null>(null);
+  const tx = useTransaction();
   const [showMintModal, setShowMintModal] = useState(false);
 
   const loadEvent = useCallback(async () => {
@@ -98,11 +96,7 @@ export default function EventDetailPage() {
 
     const contractAddr = event.contractAddress || event.contract_address || '';
     setShowMintModal(true);
-    setTxStep('preparing');
-    setTxError(null);
-    setTxHash(null);
-
-    try {
+    await tx.execute(async ({ setStep, setHash }) => {
       const contract = getContract({
         client: thirdwebClient,
         chain: activeChain,
@@ -113,22 +107,22 @@ export default function EventDetailPage() {
       const tierId = BigInt(selectedTier.tier_index ?? selectedTier.tierId ?? 0);
       let lastResult: any;
 
-      setTxStep('awaiting-signature');
+      setStep('awaiting-signature');
 
       // Contract supports 1 mint per call — loop for quantity > 1
       for (let i = 0; i < mintQty; i++) {
-        const tx = prepareContractCall({
+        const prepared = prepareContractCall({
           contract,
           method: 'function mint(uint256 tierId, bytes32[] proof) payable',
           params: [tierId, []],
           value: tierPrice,
         });
 
-        lastResult = await sendTx(tx);
+        lastResult = await sendTx(prepared);
 
         if (i === 0) {
-          setTxStep('broadcasting');
-          setTxHash(lastResult.transactionHash);
+          setStep('broadcasting');
+          setHash(lastResult.transactionHash);
         }
 
         // Record mint in backend (non-blocking — chain listener is primary source)
@@ -142,29 +136,16 @@ export default function EventDetailPage() {
         }).catch(() => {}); // Non-critical — chain listener handles reconciliation
       }
 
-      setTxStep('confirming');
-
-      setTxStep('success');
+      setStep('confirming');
+      setStep('success');
       toast.success(mintQty > 1 ? `${mintQty} tickets minted successfully!` : 'Ticket minted successfully!');
       loadEvent(); // Refresh tiers availability
-    } catch (err) {
-      const parsed = parseError(err);
-      setTxStep('error');
-      setTxError(parsed.message);
-
-      if (parsed.code === 'USER_REJECTED') {
-        toast('Transaction cancelled');
-      } else {
-        toast.error(parsed.title, { description: parsed.message });
-      }
-    }
+    });
   };
 
   const closeMintModal = () => {
     setShowMintModal(false);
-    setTxStep(null);
-    setTxError(null);
-    setTxHash(null);
+    tx.reset();
     setSelectedTier(null);
     setMintQty(1);
   };
@@ -232,7 +213,7 @@ export default function EventDetailPage() {
             {(event.banner_url || event.bannerUrl) ? (
               <img
                 src={event.banner_url || event.bannerUrl}
-                alt={event.name || event.title}
+                alt={event.title || event.name}
                 className="h-full w-full object-cover"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
@@ -249,7 +230,7 @@ export default function EventDetailPage() {
             <div className="lg:col-span-2 space-y-6">
               <motion.div initial="hidden" animate="visible" variants={fadeUp}>
                 <h1 className="text-3xl sm:text-4xl font-extrabold">
-                  <span className="bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">{event.name || event.title}</span>
+                  <span className="bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">{event.title || event.name}</span>
                 </h1>
                 {event.description && (
                   <p className="mt-3 text-muted leading-relaxed">{event.description}</p>
@@ -467,28 +448,28 @@ export default function EventDetailPage() {
       {/* Mint Transaction Modal */}
       <Modal
         open={showMintModal}
-        onClose={txStep === 'success' || txStep === 'error' ? closeMintModal : () => {}}
+        onClose={tx.step === 'success' || tx.step === 'error' ? closeMintModal : () => {}}
         title="Minting Tickets"
         size="sm"
       >
         <div className="py-2">
-          {txStep && (
+          {tx.step && (
             <TransactionTracker
-              currentStep={txStep}
-              errorMessage={txError || undefined}
-              txHash={txHash || undefined}
+              currentStep={tx.step}
+              errorMessage={tx.error || undefined}
+              txHash={tx.hash || undefined}
               blockExplorer={BLOCK_EXPLORER}
             />
           )}
 
-          {txStep === 'success' && (
+          {tx.step === 'success' && (
             <div className="mt-6 flex gap-3 justify-center">
               <Button variant="outline" onClick={closeMintModal}>Close</Button>
               <Button onClick={() => router.push('/tickets')}>View My Tickets</Button>
             </div>
           )}
 
-          {txStep === 'error' && (
+          {tx.step === 'error' && (
             <div className="mt-6 flex gap-3 justify-center">
               <Button variant="outline" onClick={closeMintModal}>Cancel</Button>
               <Button onClick={handleMint}>Try Again</Button>

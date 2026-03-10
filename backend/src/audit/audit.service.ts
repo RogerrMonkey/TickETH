@@ -15,31 +15,45 @@ interface AuditLogEntry {
 @Injectable()
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
+  private static readonly MAX_RETRIES = 3;
 
   constructor(private readonly supabase: SupabaseService) {}
 
-  /** Write an immutable audit log entry */
+  /** Write an immutable audit log entry with retry */
   async log(entry: AuditLogEntry): Promise<void> {
-    try {
-      const { error } = await this.supabase.admin
-        .from('audit_logs')
-        .insert({
-          actor_id: entry.actorId,
-          actor_wallet: entry.actorWallet,
-          action: entry.action,
-          entity_type: entry.entityType,
-          entity_id: entry.entityId,
-          details: entry.details ?? {},
-          ip_address: entry.ipAddress,
-        });
+    const row = {
+      actor_id: entry.actorId,
+      actor_wallet: entry.actorWallet,
+      action: entry.action,
+      entity_type: entry.entityType,
+      entity_id: entry.entityId,
+      details: entry.details ?? {},
+      ip_address: entry.ipAddress,
+    };
 
-      if (error) {
-        this.logger.error(`Failed to write audit log: ${error.message}`, error);
+    for (let attempt = 1; attempt <= AuditService.MAX_RETRIES; attempt++) {
+      try {
+        const { error } = await this.supabase.admin
+          .from('audit_logs')
+          .insert(row);
+
+        if (!error) return;
+
+        this.logger.error(
+          `Audit log attempt ${attempt}/${AuditService.MAX_RETRIES} failed: ${error.message}`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Audit log attempt ${attempt}/${AuditService.MAX_RETRIES} threw: ${(err as Error).message}`,
+        );
       }
-    } catch (err) {
-      // Audit logging should never crash the application
-      this.logger.error('Audit log write failed', err);
+
+      if (attempt < AuditService.MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 100 * 2 ** (attempt - 1)));
+      }
     }
+
+    this.logger.error('Audit log write permanently failed after retries', { entry });
   }
 
   /** Query audit logs (admin only) */

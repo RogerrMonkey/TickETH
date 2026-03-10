@@ -31,6 +31,7 @@ export async function getTicketsByEvent(
 export async function recordMint(payload: {
   eventId: string;
   tierId: string;
+  contractAddress: string;
   tokenId: number;
   txHash: string;
   ownerWallet: string;
@@ -42,11 +43,5 @@ export async function recordMint(payload: {
 /** Get ticket tiers for an event */
 export async function getEventTiers(eventId: string): Promise<TicketTier[]> {
   const { data } = await apiClient.get<TicketTier[]>(`/events/${eventId}/tiers`);
-  return data;
-}
-
-/** Get tier availability (remaining supply) */
-export async function getTierAvailability(eventId: string) {
-  const { data } = await apiClient.get(`/events/${eventId}/tiers/availability`);
   return data;
 }

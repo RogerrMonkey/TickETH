@@ -83,10 +83,15 @@ export const useOfflineStore = create<OfflineState>((set, get) => ({
         AsyncStorage.getItem(SCANS_KEY),
         AsyncStorage.getItem(SNAPSHOTS_KEY),
       ]);
-      set({
-        pendingScans: scansJson ? JSON.parse(scansJson) : [],
-        snapshots: snapshotsJson ? JSON.parse(snapshotsJson) : {},
-      });
+      const pendingScans = scansJson ? JSON.parse(scansJson) : [];
+      // Prune expired snapshots on hydrate
+      const raw: Record<string, OwnershipSnapshot> = snapshotsJson ? JSON.parse(snapshotsJson) : {};
+      const now = Date.now();
+      const snapshots: Record<string, OwnershipSnapshot> = {};
+      for (const [k, v] of Object.entries(raw)) {
+        if (now - v.fetchedAt <= OFFLINE_CACHE_TTL) snapshots[k] = v;
+      }
+      set({ pendingScans, snapshots });
     } catch {
       // Silently fail — start with empty state
     }

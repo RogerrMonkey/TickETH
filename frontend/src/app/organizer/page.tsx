@@ -19,6 +19,7 @@ import { parseError } from '@/lib/error-parser';
 import { TiltCard, GlowBorder } from '@/components/ui/AnimatedElements';
 import { toast } from 'sonner';
 import type { TickETHEvent, OrganizerRequest } from '@/lib/types';
+import { PageHeader } from '@/components/PageHeader';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -119,12 +120,12 @@ export default function OrganizerDashboardPage() {
 
   const totalTickets = events.reduce((sum, e) => {
     const tiers = (e as any).tiers ?? [];
-    return sum + tiers.reduce((s: number, t: any) => s + (t.maxSupply || 0), 0);
+    return sum + tiers.reduce((s: number, t: any) => s + (t.max_supply || 0), 0);
   }, 0);
 
   const totalMinted = events.reduce((sum, e) => {
     const tiers = (e as any).tiers ?? [];
-    return sum + tiers.reduce((s: number, t: any) => s + (t.mintedCount || 0), 0);
+    return sum + tiers.reduce((s: number, t: any) => s + (t.minted || 0), 0);
   }, 0);
 
   // Not signed in
@@ -221,31 +222,31 @@ export default function OrganizerDashboardPage() {
       <main className="flex-1 px-4 py-10">
         <div className="mx-auto max-w-7xl">
           {/* Header */}
-          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Dashboard</span>
-              <h1 className="mt-2 text-4xl font-extrabold">
-                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Organizer</span>{' '}Dashboard
-              </h1>
-              <p className="mt-1 text-muted">Manage your events and track performance</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link href="/organizer/volunteers">
-                <Button variant="outline">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-2">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <line x1="19" y1="8" x2="19" y2="14" />
-                    <line x1="22" y1="11" x2="16" y2="11" />
-                  </svg>
-                  Manage Volunteers
-                </Button>
-              </Link>
-              <Link href="/organizer/create">
-                <Button>+ Create Event</Button>
-              </Link>
-            </div>
-          </div>
+          <PageHeader
+            category="Dashboard"
+            title="Dashboard"
+            highlight="Organizer"
+            highlightFirst
+            description="Manage your events and track performance"
+            right={
+              <div className="flex items-center gap-3">
+                <Link href="/organizer/volunteers">
+                  <Button variant="outline">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-2">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <line x1="19" y1="8" x2="19" y2="14" />
+                      <line x1="22" y1="11" x2="16" y2="11" />
+                    </svg>
+                    Manage Volunteers
+                  </Button>
+                </Link>
+                <Link href="/organizer/create">
+                  <Button>+ Create Event</Button>
+                </Link>
+              </div>
+            }
+          />
 
           {/* Stats */}
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -321,7 +322,7 @@ export default function OrganizerDashboardPage() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              setDeleteTitle(event.name);
+                              setDeleteTitle(event.title || event.name);
                               setDeleteId(event.id);
                             }}
                             className="rounded-lg bg-surface/80 backdrop-blur p-1.5 text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
@@ -341,15 +342,15 @@ export default function OrganizerDashboardPage() {
                       </div>
                       <div className="p-5">
                         <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-1">
-                          {event.name}
+                          {event.title || event.name}
                         </h3>
                         <p className="mt-2 text-sm text-muted">
-                          {event.date ? formatDate(event.date) : 'TBA'}
+                          {(event.start_time || event.startTime || event.date) ? formatDate(event.start_time || event.startTime || event.date!) : 'TBA'}
                         </p>
                         <div className="mt-3 flex items-center justify-between text-xs text-muted">
                           <span>{(event as any).tiers?.length ?? 0} tiers</span>
                           <span>
-                            {(event as any).tiers?.reduce((s: number, t: any) => s + (t.mintedCount || 0), 0) ?? 0} minted
+                            {(event as any).tiers?.reduce((s: number, t: any) => s + (t.minted || 0), 0) ?? 0} minted
                           </span>
                         </div>
                       </div>

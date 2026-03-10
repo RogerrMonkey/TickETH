@@ -1,6 +1,7 @@
 import {
   Injectable,
   NotFoundException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -30,36 +31,55 @@ export class TicketsService {
       return { queued: true, txHash: dto.txHash };
     }
 
-    // Check if already recorded (idempotent)
-    const { data: existing } = await this.supabase.admin
-      .from('tickets')
-      .select('id')
-      .eq('contract_address', dto.contractAddress.toLowerCase())
-      .eq('token_id', dto.tokenId)
-      .maybeSingle();
+    // Validate minting time window: only allowed until event end time
+    if (dto.eventId) {
+      const { data: event } = await this.supabase.admin
+        .from('events')
+        .select('end_time')
+        .eq('id', dto.eventId)
+        .single();
 
-    if (existing) {
-      this.logger.debug(`Token ${dto.tokenId} already recorded — skipping`);
-      return existing;
+      if (event?.end_time) {
+        const endTime = new Date(event.end_time).getTime();
+        if (Date.now() > endTime) {
+          throw new BadRequestException(
+            'Minting is no longer available. The event has ended.',
+          );
+        }
+      }
     }
 
+    // Upsert — atomically insert or return existing (prevents race condition)
     const { data, error } = await this.supabase.admin
       .from('tickets')
-      .insert({
-        token_id: dto.tokenId,
-        contract_address: dto.contractAddress.toLowerCase(),
-        event_id: dto.eventId,
-        tier_id: dto.tierId,
-        owner_wallet: dto.ownerWallet.toLowerCase(),
-        original_wallet: dto.ownerWallet.toLowerCase(),
-        status: TicketStatus.MINTED,
-        tx_hash: dto.txHash,
-        metadata_uri: dto.metadataUri,
-      })
+      .upsert(
+        {
+          token_id: dto.tokenId,
+          contract_address: dto.contractAddress.toLowerCase(),
+          event_id: dto.eventId,
+          tier_id: dto.tierId,
+          owner_wallet: dto.ownerWallet.toLowerCase(),
+          original_wallet: dto.ownerWallet.toLowerCase(),
+          status: TicketStatus.MINTED,
+          tx_hash: dto.txHash,
+          metadata_uri: dto.metadataUri,
+        },
+        { onConflict: 'contract_address,token_id', ignoreDuplicates: true },
+      )
       .select('*')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // If duplicate detected via constraint, fetch and return existing
+      if (error.code === '23505') {
+        const existing = await this.findByToken(dto.contractAddress, dto.tokenId!);
+        if (existing) {
+          this.logger.debug(`Token ${dto.tokenId} already recorded — skipping`);
+          return existing;
+        }
+      }
+      throw error;
+    }
 
     // Increment minted count on tier
     await this.tiers.incrementMinted(dto.tierId);

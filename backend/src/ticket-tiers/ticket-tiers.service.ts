@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { SupabaseService } from '../common/supabase/supabase.service';
 import { EventsService } from '../events/events.service';
@@ -10,53 +11,16 @@ import { UpdateTierDto } from './dto/update-tier.dto';
 
 @Injectable()
 export class TicketTiersService {
+  private readonly logger = new Logger(TicketTiersService.name);
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly events: EventsService,
   ) {}
 
-  /** Create a tier for an event */
-  async create(eventId: string, organizerId: string, dto: CreateTierDto) {
-    const event = await this.events.findById(eventId);
-    if (event.organizer_id !== organizerId) {
-      throw new ForbiddenException('You do not own this event');
-    }
-
-    const { data, error } = await this.supabase.admin
-      .from('ticket_tiers')
-      .insert({
-        event_id: eventId,
-        tier_index: dto.tierIndex,
-        name: dto.name,
-        description: dto.description,
-        price: dto.price,
-        price_wei: dto.priceWei,
-        currency: dto.currency ?? 'MATIC',
-        max_supply: dto.maxSupply,
-        resale_allowed: dto.resaleAllowed ?? true,
-        start_time: dto.startTime,
-        end_time: dto.endTime,
-        max_per_wallet: dto.maxPerWallet ?? 0,
-        merkle_root: dto.merkleRoot,
-        max_resales: dto.maxResales ?? 0,
-        max_price_deviation_bps: dto.maxPriceDeviationBps ?? 0,
-        active: dto.active ?? true,
-      })
-      .select('*')
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
-
-  /** Batch-create tiers for an event */
-  async createBatch(eventId: string, organizerId: string, tiers: CreateTierDto[]) {
-    const event = await this.events.findById(eventId);
-    if (event.organizer_id !== organizerId) {
-      throw new ForbiddenException('You do not own this event');
-    }
-
-    const rows = tiers.map((dto) => ({
+  /** Map a DTO to a database row */
+  private mapDtoToRow(eventId: string, dto: CreateTierDto) {
+    return {
       event_id: eventId,
       tier_index: dto.tierIndex,
       name: dto.name,
@@ -73,7 +37,37 @@ export class TicketTiersService {
       max_resales: dto.maxResales ?? 0,
       max_price_deviation_bps: dto.maxPriceDeviationBps ?? 0,
       active: dto.active ?? true,
-    }));
+    };
+  }
+
+  /** Verify event ownership */
+  private async verifyOwnership(eventId: string, organizerId: string) {
+    const event = await this.events.findById(eventId);
+    if (event.organizer_id !== organizerId) {
+      throw new ForbiddenException('You do not own this event');
+    }
+    return event;
+  }
+
+  /** Create a tier for an event */
+  async create(eventId: string, organizerId: string, dto: CreateTierDto) {
+    await this.verifyOwnership(eventId, organizerId);
+
+    const { data, error } = await this.supabase.admin
+      .from('ticket_tiers')
+      .insert(this.mapDtoToRow(eventId, dto))
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /** Batch-create tiers for an event */
+  async createBatch(eventId: string, organizerId: string, tiers: CreateTierDto[]) {
+    await this.verifyOwnership(eventId, organizerId);
+
+    const rows = tiers.map((dto) => this.mapDtoToRow(eventId, dto));
 
     const { data, error } = await this.supabase.admin
       .from('ticket_tiers')
@@ -109,7 +103,6 @@ export class TicketTiersService {
 
   /** Update a tier */
   async update(tierId: string, organizerId: string, dto: UpdateTierDto) {
-    // Verify ownership via event
     const { data: tier } = await this.supabase.admin
       .from('ticket_tiers')
       .select('*, events!inner(organizer_id)')
@@ -121,20 +114,18 @@ export class TicketTiersService {
       throw new ForbiddenException('You do not own this event');
     }
 
+    const fieldMap: Record<string, string> = {
+      name: 'name', description: 'description', price: 'price',
+      priceWei: 'price_wei', maxSupply: 'max_supply', resaleAllowed: 'resale_allowed',
+      startTime: 'start_time', endTime: 'end_time', maxPerWallet: 'max_per_wallet',
+      merkleRoot: 'merkle_root', maxResales: 'max_resales',
+      maxPriceDeviationBps: 'max_price_deviation_bps', active: 'active',
+    };
+
     const updateData: Record<string, any> = {};
-    if (dto.name !== undefined) updateData.name = dto.name;
-    if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.price !== undefined) updateData.price = dto.price;
-    if (dto.priceWei !== undefined) updateData.price_wei = dto.priceWei;
-    if (dto.maxSupply !== undefined) updateData.max_supply = dto.maxSupply;
-    if (dto.resaleAllowed !== undefined) updateData.resale_allowed = dto.resaleAllowed;
-    if (dto.startTime !== undefined) updateData.start_time = dto.startTime;
-    if (dto.endTime !== undefined) updateData.end_time = dto.endTime;
-    if (dto.maxPerWallet !== undefined) updateData.max_per_wallet = dto.maxPerWallet;
-    if (dto.merkleRoot !== undefined) updateData.merkle_root = dto.merkleRoot;
-    if (dto.maxResales !== undefined) updateData.max_resales = dto.maxResales;
-    if (dto.maxPriceDeviationBps !== undefined) updateData.max_price_deviation_bps = dto.maxPriceDeviationBps;
-    if (dto.active !== undefined) updateData.active = dto.active;
+    for (const [dtoKey, dbKey] of Object.entries(fieldMap)) {
+      if ((dto as any)[dtoKey] !== undefined) updateData[dbKey] = (dto as any)[dtoKey];
+    }
 
     const { data, error } = await this.supabase.admin
       .from('ticket_tiers')
@@ -147,9 +138,21 @@ export class TicketTiersService {
     return data;
   }
 
-  /** Increment minted count (called after on-chain mint) */
+  /** Increment minted count atomically */
   async incrementMinted(tierId: string, count = 1) {
-    // Use RPC function or manual increment
+    // Atomic increment using Supabase RPC — if the function doesn't exist, fall back
+    try {
+      const { data, error } = await this.supabase.admin.rpc('increment_tier_minted', {
+        p_tier_id: tierId,
+        p_count: count,
+      });
+      if (!error) return data;
+      this.logger.warn(`RPC increment_tier_minted not available, using fallback: ${error.message}`);
+    } catch {
+      // RPC not available, use fallback
+    }
+
+    // Fallback: read + write (not perfectly atomic but functional)
     const { data: tier } = await this.supabase.admin
       .from('ticket_tiers')
       .select('minted')

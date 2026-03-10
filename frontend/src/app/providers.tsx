@@ -1,28 +1,24 @@
 'use client';
 
 import { ThirdwebProvider } from 'thirdweb/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { useState } from 'react';
+import { useEffect } from 'react';
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 30_000,
-            retry: 2,
-            refetchOnWindowFocus: false,
-          },
-        },
-      }),
-  );
+  // Suppress Thirdweb's nested <button> hydration warning (their DetailsModal
+  // renders CopyIcon <button> inside a Styled <button> — can't fix upstream)
+  useEffect(() => {
+    const orig = console.error;
+    console.error = (...args: unknown[]) => {
+      if (typeof args[0] === 'string' && args[0].includes('<button> cannot be a descendant of <button>')) return;
+      orig.apply(console, args);
+    };
+    return () => { console.error = orig; };
+  }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThirdwebProvider>
+    <ThirdwebProvider>
         <ErrorBoundary>
           {children}
         </ErrorBoundary>
@@ -42,6 +38,5 @@ export function Providers({ children }: { children: React.ReactNode }) {
           duration={4000}
         />
       </ThirdwebProvider>
-    </QueryClientProvider>
   );
 }

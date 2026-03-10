@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import ReAnimated from 'react-native-reanimated';
+import { usePulse } from '../utils/animations';
 import QRCodeSvg from 'react-native-qrcode-svg';
 import { Colors, Typography, Spacing, BorderRadius } from '../constants/theme';
 import { LoadingSpinner } from './ui/LoadingSpinner';
@@ -24,32 +26,9 @@ export function QRCodeDisplay({
   expiresAt,
   size = 240,
 }: QRCodeDisplayProps) {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  // Pulse animation when near expiry
-  useEffect(() => {
-    if (!expiresAt) return;
-
-    const remaining = expiresAt - Date.now();
-    if (remaining < 5000 && remaining > 0) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 0.6,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-        ]),
-      ).start();
-    }
-
-    return () => pulseAnim.stopAnimation();
-  }, [expiresAt, pulseAnim]);
+  // Pulse when near expiry
+  const nearExpiry = !!(expiresAt && expiresAt - Date.now() < 5000 && expiresAt - Date.now() > 0);
+  const pulseStyle = usePulse(nearExpiry);
 
   if (loading && !data) {
     return (
@@ -76,7 +55,7 @@ export function QRCodeDisplay({
   }
 
   return (
-    <Animated.View style={[styles.qrWrapper, { opacity: pulseAnim }]}>
+    <ReAnimated.View style={[styles.qrWrapper, pulseStyle]}>
       <View style={styles.qrContainer}>
         <QRCodeSvg
           value={data}
@@ -92,7 +71,7 @@ export function QRCodeDisplay({
         </View>
       )}
       <Text style={styles.hint}>Show this to the scanner</Text>
-    </Animated.View>
+    </ReAnimated.View>
   );
 }
 
@@ -101,7 +80,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   qrWrapper: {
     alignItems: 'center',
@@ -109,7 +90,7 @@ const styles = StyleSheet.create({
   qrContainer: {
     padding: Spacing.lg,
     backgroundColor: '#FFFFFF',
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     ...({
       shadowColor: Colors.primary,
       shadowOffset: { width: 0, height: 0 },

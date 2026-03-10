@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Animated,
   TouchableOpacity,
 } from 'react-native';
+import ReAnimated from 'react-native-reanimated';
+import { useFadeIn } from '../../src/utils/animations';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,16 +43,11 @@ export default function TransferScreen() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const successFade = useRef(new Animated.Value(0)).current;
+  const contentStyle = useFadeIn(0);
+  const successStyle = useFadeIn(success ? 0 : 99999);
 
   useEffect(() => {
     analytics.screenView('transfer');
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
   }, []);
 
   /* ── Validate address ─────────────────────────────────── */
@@ -111,12 +107,6 @@ export default function TransferScreen() {
       setSuccess(txHash);
       setShowConfetti(true);
 
-      Animated.timing(successFade, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
-
       showToast({ type: 'success', title: 'Transfer Complete!', message: 'Your ticket has been transferred.' });
     } catch (err: any) {
       const parsed = parseError(err);
@@ -164,8 +154,8 @@ export default function TransferScreen() {
     return (
       <SafeAreaView style={styles.container}>
         {showConfetti && <ConfettiAnimation />}
-        <Animated.View style={[styles.resultContainer, { opacity: successFade }]}>
-          <View style={[styles.resultIcon, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
+        <ReAnimated.View style={[styles.resultContainer, successStyle]}>
+          <View style={[styles.resultIcon, { backgroundColor: Colors.successMuted }]}>
             <Ionicons name="checkmark-circle" size={96} color={Colors.success} />
           </View>
           <Text style={styles.resultTitle}>Transfer Complete!</Text>
@@ -193,7 +183,7 @@ export default function TransferScreen() {
             size="lg"
             style={{ marginTop: Spacing['3xl'] }}
           />
-        </Animated.View>
+        </ReAnimated.View>
       </SafeAreaView>
     );
   }
@@ -215,7 +205,7 @@ export default function TransferScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View style={{ opacity: fadeAnim }}>
+          <ReAnimated.View style={contentStyle}>
             {/* Warning banner */}
             <View style={styles.warningBanner} accessibilityRole="alert">
               <Ionicons name="warning" size={20} color={Colors.warning} />
@@ -237,7 +227,7 @@ export default function TransferScreen() {
                 <View style={styles.ticketDetail}>
                   <Ionicons name="diamond-outline" size={14} color={Colors.textMuted} />
                   <Text style={styles.ticketDetailText}>
-                    Original price: {formatPrice(ticket.tier.price)}
+                    Original price: {formatPrice(ticket.tier.price_wei)}
                   </Text>
                 </View>
               )}
@@ -305,7 +295,7 @@ export default function TransferScreen() {
               icon={<Ionicons name="swap-horizontal" size={20} color={Colors.textPrimary} />}
               style={{ marginTop: Spacing.xl }}
             />
-          </Animated.View>
+          </ReAnimated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -318,17 +308,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing['6xl'],
   },
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    backgroundColor: 'rgba(245,158,11,0.1)',
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
+    backgroundColor: Colors.warningMuted,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
     marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.15)',
   },
   warningText: {
     color: Colors.warning,
@@ -349,11 +341,12 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
+    letterSpacing: -0.2,
   },
   ticketTier: {
     color: Colors.textSecondary,
     fontSize: Typography.sizes.sm,
-    marginTop: 2,
+    marginTop: 3,
   },
   ticketDetail: {
     flexDirection: 'row',
@@ -383,31 +376,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   pasteButtonText: {
     color: Colors.primary,
     fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
+    fontWeight: Typography.weights.semibold,
   },
   previewCard: {
     marginBottom: Spacing.md,
   },
   previewTitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
+    color: Colors.textMuted,
+    fontSize: Typography.sizes['2xs'],
+    fontWeight: Typography.weights.bold,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     marginBottom: Spacing.md,
   },
   previewRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -438,6 +433,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: Typography.sizes['2xl'],
     fontWeight: Typography.weights.extrabold,
+    letterSpacing: -0.3,
   },
   resultMessage: {
     color: Colors.textSecondary,
@@ -451,9 +447,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs,
     marginTop: Spacing.md,
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surface,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   txHash: {
     color: Colors.textMuted,

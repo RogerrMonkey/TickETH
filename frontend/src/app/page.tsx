@@ -34,7 +34,7 @@ const fadeUp = {
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+    transition: { delay: i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
 
@@ -48,7 +48,7 @@ const scaleIn = {
   visible: (i: number) => ({
     opacity: 1,
     scale: 1,
-    transition: { delay: i * 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+    transition: { delay: i * 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
 
@@ -471,7 +471,7 @@ export default function HomePage() {
                             {event.city && <span className="text-xs text-muted">{event.city}</span>}
                           </div>
                           <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                            {event.name || event.title}
+                            {event.title || event.name}
                           </h3>
                           <p className="mt-1 text-sm text-muted">
                             {event.start_time || event.startTime

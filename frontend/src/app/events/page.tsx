@@ -10,6 +10,7 @@ import { CardSkeleton } from '@/components/Skeleton';
 import { Badge } from '@/components/Badge';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/Button';
+import { PageHeader } from '@/components/PageHeader';
 import { eventsApi } from '@/lib/api';
 import { formatDate, formatPrice, getTierPrice } from '@/lib/utils';
 import { cn } from '@/lib/cn';
@@ -135,41 +136,36 @@ function EventsContent() {
       <main className="flex-1 px-4 py-10">
         <div className="mx-auto max-w-7xl">
           {/* Header */}
-          <div className="mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <div>
-              <span className="text-xs font-bold text-primary uppercase tracking-[0.3em]">Discover</span>
-              <h1 className="mt-2 text-4xl font-extrabold">
-                Browse{' '}
-                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Events</span>
-              </h1>
-              <p className="mt-2 text-muted">
-                {loading ? 'Loading...' : `${total} event${total !== 1 ? 's' : ''} found`}
-              </p>
-            </div>
-            {/* View toggle */}
-            <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={cn(
-                  'rounded-md p-1.5 transition-colors',
-                  viewMode === 'grid' ? 'bg-primary/15 text-primary' : 'text-muted hover:text-foreground',
-                )}
-                aria-label="Grid view"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={cn(
-                  'rounded-md p-1.5 transition-colors',
-                  viewMode === 'list' ? 'bg-primary/15 text-primary' : 'text-muted hover:text-foreground',
-                )}
-                aria-label="List view"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
-              </button>
-            </div>
-          </div>
+          <PageHeader
+            category="Discover"
+            title="Browse"
+            highlight="Events"
+            description={loading ? 'Loading...' : `${total} event${total !== 1 ? 's' : ''} found`}
+            right={
+              <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={cn(
+                    'rounded-md p-1.5 transition-colors',
+                    viewMode === 'grid' ? 'bg-primary/15 text-primary' : 'text-muted hover:text-foreground',
+                  )}
+                  aria-label="Grid view"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    'rounded-md p-1.5 transition-colors',
+                    viewMode === 'list' ? 'bg-primary/15 text-primary' : 'text-muted hover:text-foreground',
+                  )}
+                  aria-label="List view"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
+                </button>
+              </div>
+            }
+          />
 
           {/* Filters */}
           <div className="mb-8 flex flex-col sm:flex-row gap-3 rounded-2xl border border-border/30 bg-surface/60 backdrop-blur-sm p-4">
@@ -269,7 +265,7 @@ function EventsContent() {
                         <div className="rounded-2xl border border-border/30 bg-surface/80 backdrop-blur-sm overflow-hidden hover:border-primary/40 transition-all duration-300 hover:shadow-xl hover:shadow-primary/10">
                           <div className="relative h-48 bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center overflow-hidden">
                             {(event.banner_url || event.bannerUrl) ? (
-                              <img src={event.banner_url || event.bannerUrl} alt={event.name || event.title} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              <img src={event.banner_url || event.bannerUrl} alt={event.title || event.name} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             ) : (
                               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary/40">
                                 <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
@@ -278,7 +274,7 @@ function EventsContent() {
                             <div className="absolute top-3 right-3"><Badge status={event.status} /></div>
                           </div>
                           <div className="p-5">
-                            <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-1">{event.name || event.title}</h3>
+                            <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-1">{event.title || event.name}</h3>
                             <div className="mt-3 flex items-center gap-2 text-sm text-muted">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                               {event.start_time || event.startTime ? formatDate(event.start_time || event.startTime || '') : event.date ? formatDate(event.date) : 'TBA'}
@@ -332,7 +328,7 @@ function EventsContent() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <h3 className="font-semibold group-hover:text-primary transition-colors truncate">{event.name || event.title}</h3>
+                              <h3 className="font-semibold group-hover:text-primary transition-colors truncate">{event.title || event.name}</h3>
                               <Badge status={event.status} />
                             </div>
                             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">

@@ -1,6 +1,6 @@
 /* ─── User ──────────────────────────────────────────────── */
 
-export type UserRole = 'visitor' | 'attendee' | 'organizer' | 'admin' | 'volunteer';
+export type UserRole = 'visitor' | 'attendee' | 'organizer' | 'admin' | 'super_admin' | 'volunteer';
 
 export interface User {
   id: string;
@@ -58,10 +58,14 @@ export interface TicketTier {
   id: string;
   event_id: string;
   name: string;
-  price: string; // wei string
-  supply: number;
+  price: string; // MATIC decimal (e.g. "0.01")
+  price_wei: string; // exact wei string for on-chain calls
+  tier_index?: number;
+  max_supply: number;
   minted: number;
   resale_allowed: boolean;
+  max_resales: number; // 0 = unlimited
+  max_price_deviation_bps: number; // 0 = no cap, e.g. 1000 = 10%
   metadata_uri?: string;
   description?: string;
 }
@@ -82,6 +86,8 @@ export interface Ticket {
   checked_in_at?: string;
   tx_hash?: string;
   metadata_uri?: string;
+  transfer_count: number;
+  original_price_wei?: string;
   // Joined
   event?: TickETHEvent;
   tier?: TicketTier;

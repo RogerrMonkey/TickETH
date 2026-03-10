@@ -7,9 +7,9 @@ import {
   RefreshControl,
   TextInput,
   TouchableOpacity,
-  Animated,
   ScrollView,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ import { useEvents } from '../../src/hooks/useEvents';
 import { useOfflineStore } from '../../src/stores/offlineStore';
 import { EventCardSkeleton } from '../../src/components/Skeleton';
 import { analytics } from '../../src/services/analytics';
+import { useStaggeredEntrance, useFadeIn } from '../../src/utils/animations';
 
 type SortOption = 'date' | 'price' | 'popularity';
 type FilterOption = 'all' | 'upcoming' | 'live' | 'completed';
@@ -78,11 +79,11 @@ export default function EventsScreen() {
     } else if (sortBy === 'price') {
       sorted.sort((a, b) => {
         const aMin = a.tiers?.reduce((min, t) => {
-          const p = BigInt(t.price);
+          const p = BigInt(t.price_wei || '0');
           return p < min ? p : min;
         }, BigInt('999999999999999999999')) ?? BigInt(0);
         const bMin = b.tiers?.reduce((min, t) => {
-          const p = BigInt(t.price);
+          const p = BigInt(t.price_wei || '0');
           return p < min ? p : min;
         }, BigInt('999999999999999999999')) ?? BigInt(0);
         return aMin < bMin ? -1 : aMin > bMin ? 1 : 0;
@@ -134,26 +135,8 @@ export default function EventsScreen() {
         </View>
       )}
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.greeting}>{greeting()}</Text>
-            <Text style={styles.title} accessibilityRole="header">
-              Discover Events
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() => router.push('/(tabs)/profile')}
-            accessibilityLabel="Open profile"
-            accessibilityRole="button"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="person-circle" size={36} color={Colors.primary} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      {/* Animated Header */}
+      <AnimatedHeader greeting={greeting()} />
 
       {/* Search bar */}
       <View style={styles.searchContainer}>
@@ -247,6 +230,9 @@ export default function EventsScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews
           refreshControl={
             <RefreshControl
               refreshing={loading && events.length > 0}
@@ -274,7 +260,22 @@ export default function EventsScreen() {
   );
 }
 
-/** Animated wrapper for fade-in entrance */
+/** Animated header with staggered entrance */
+function AnimatedHeader({ greeting }: { greeting: string }) {
+  const greetingStyle = useFadeIn(0);
+  const titleStyle = useFadeIn(100);
+
+  return (
+    <View style={styles.header}>
+      <Animated.Text style={[styles.greeting, greetingStyle]}>{greeting}</Animated.Text>
+      <Animated.Text style={[styles.title, titleStyle]} accessibilityRole="header">
+        Discover Events
+      </Animated.Text>
+    </View>
+  );
+}
+
+/** Reanimated staggered entrance for list items */
 function AnimatedEventCard({
   event,
   index,
@@ -284,29 +285,10 @@ function AnimatedEventCard({
   index: number;
   onPress: () => void;
 }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-
-  useEffect(() => {
-    const delay = Math.min(index * 80, 400);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 350,
-        delay,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 350,
-        delay,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+  const animatedStyle = useStaggeredEntrance(index);
 
   return (
-    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+    <Animated.View style={animatedStyle}>
       <EventCard event={event} onPress={onPress} />
     </Animated.View>
   );
@@ -321,10 +303,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.xs,
-    backgroundColor: 'rgba(245,158,11,0.15)',
+    gap: Spacing.sm,
+    backgroundColor: Colors.warningMuted,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,184,0,0.15)',
   },
   offlineBannerText: {
     color: Colors.warning,
@@ -332,42 +316,38 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.medium,
   },
   header: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.lg,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  profileButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingBottom: Spacing.sm,
   },
   greeting: {
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
+    letterSpacing: 0.5,
   },
   title: {
     color: Colors.textPrimary,
     fontSize: Typography.sizes['3xl'],
     fontWeight: Typography.weights.extrabold,
+    letterSpacing: -0.5,
+    marginTop: Spacing['2xs'],
   },
   searchContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    height: 44,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.lg,
+    height: 48,
     gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   searchInput: {
     flex: 1,
@@ -376,7 +356,7 @@ const styles = StyleSheet.create({
   },
   filtersRow: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.sm,
     gap: Spacing.sm,
     alignItems: 'center',
@@ -384,31 +364,35 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    gap: 6,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   pillActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryMuted,
+    borderColor: Colors.borderActive,
   },
   pillText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.medium,
+    color: Colors.textMuted,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
   pillTextActive: {
-    color: Colors.textPrimary,
+    color: Colors.primary,
   },
   pillDivider: {
     width: 1,
-    height: 20,
+    height: 16,
     backgroundColor: Colors.border,
-    marginHorizontal: 2,
+    marginHorizontal: Spacing.xs,
   },
   list: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing['6xl'],
+    paddingTop: Spacing.xs,
   },
 });
