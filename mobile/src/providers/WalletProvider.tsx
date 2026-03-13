@@ -69,11 +69,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const disconnect = useCallback(async () => {
     isDisconnecting.current = true;
     try {
+      // Clear auth & wallet state first (before thirdweb fires doLogout)
+      await useAuthStore.getState().logout();
+      wallet.disconnect();
+      // Then tell thirdweb to disconnect; its doLogout callback
+      // will no-op since user is already null
       if (activeWallet) {
         twDisconnect(activeWallet);
       }
-      wallet.disconnect();
-      await useAuthStore.getState().logout();
     } finally {
       // Reset after a delay to allow all useEffect cycles to settle
       setTimeout(() => { isDisconnecting.current = false; }, 500);

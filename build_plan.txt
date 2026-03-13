@@ -164,7 +164,7 @@ Overlaps with Phase 5.
 2. Docker Compose for local dev
 3. Kubernetes manifests (deployment, services, ingress)
 4. GitHub Actions CI/CD:
-   - Build → Test → Docker buildx → Deploy staging (Mumbai) → Deploy prod (Polygon)
+   - Build → Test → Docker buildx → Deploy staging (amoy) → Deploy prod (Polygon)
 5. Prometheus + Grafana dashboards (mint rate, check-in latency, queue backlog)
 6. Sentry error tracking
 7. Health check endpoints

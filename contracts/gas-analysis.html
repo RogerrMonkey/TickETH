@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TickETH Gas Cost Analysis</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0a0a0f;
+      color: #e4e4e7;
+      padding: 2rem;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      text-align: center;
+      color: #71717a;
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      max-width: 1400px;
+      margin: 0 auto 2rem;
+    }
+    .card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+    .card.full { grid-column: 1 / -1; }
+    .card h2 {
+      font-size: 1.1rem;
+      color: #a1a1aa;
+      margin-bottom: 1rem;
+    }
+    canvas { width: 100% !important; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+      max-width: 1400px;
+      margin: 0 auto 2rem;
+    }
+    .stat-card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .stat-card .label { color: #71717a; font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 700; }
+    .stat-card .value.green { color: #22c55e; }
+    .stat-card .value.purple { color: #7c3aed; }
+    .stat-card .value.blue { color: #3b82f6; }
+    .stat-card .value.amber { color: #f59e0b; }
+    .assumptions {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      color: #71717a;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+    .assumptions strong { color: #a1a1aa; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid #27272a; }
+    th { color: #71717a; font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr:hover { background: #1f1f23; }
+    .savings { color: #22c55e; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>TickETH Gas Cost Analysis</h1>
+  <p class="subtitle">Polygon (PoS) vs Ethereum Mainnet — All TickETH Smart Contract Operations</p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="label">Avg Cost Savings</div>
+      <div class="value green">99.99%</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Mint Cost (Polygon)</div>
+      <div class="value purple">$0.001560</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Mint Cost (Ethereum)</div>
+      <div class="value blue">$11.4390</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Ops Measured</div>
+      <div class="value amber">14</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Chart 1: Operational Costs Bar Chart -->
+    <div class="card full">
+      <h2>Operational Costs — USD per Transaction</h2>
+      <canvas id="costChart" height="100"></canvas>
+    </div>
+
+    <!-- Chart 2: Gas Units -->
+    <div class="card">
+      <h2>Gas Units per Operation</h2>
+      <canvas id="gasChart" height="200"></canvas>
+    </div>
+
+    <!-- Chart 3: Deployment Costs -->
+    <div class="card">
+      <h2>One-Time Deployment Costs (USD)</h2>
+      <canvas id="deployChart" height="200"></canvas>
+    </div>
+
+    <!-- Table -->
+    <div class="card full">
+      <h2>Detailed Breakdown</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Operation</th>
+            <th style="text-align:right">Gas Used</th>
+            <th style="text-align:right">Ethereum Cost</th>
+            <th style="text-align:right">Polygon Cost</th>
+            <th style="text-align:right">Savings</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+          <tr>
+            <td>Deploy Implementation</td>
+            <td class="num">3,317,802</td>
+            <td class="num">$182.4791</td>
+            <td class="num">$0.024884</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Deploy Factory</td>
+            <td class="num">943,347</td>
+            <td class="num">$51.8841</td>
+            <td class="num">$0.007075</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Deploy Marketplace</td>
+            <td class="num">1,646,820</td>
+            <td class="num">$90.5751</td>
+            <td class="num">$0.012351</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Create Event (Clone)</td>
+            <td class="num">417,617</td>
+            <td class="num">$22.9689</td>
+            <td class="num">$0.003132</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Add Tier</td>
+            <td class="num">219,272</td>
+            <td class="num">$12.0600</td>
+            <td class="num">$0.001645</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Mint Ticket</td>
+            <td class="num">207,981</td>
+            <td class="num">$11.4390</td>
+            <td class="num">$0.001560</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Mint 2nd Ticket</td>
+            <td class="num">139,581</td>
+            <td class="num">$7.6770</td>
+            <td class="num">$0.001047</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Check-In</td>
+            <td class="num">53,213</td>
+            <td class="num">$2.9267</td>
+            <td class="num">$0.000399</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Set Marketplace</td>
+            <td class="num">49,988</td>
+            <td class="num">$2.7493</td>
+            <td class="num">$0.000375</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Approve (ERC-721)</td>
+            <td class="num">51,487</td>
+            <td class="num">$2.8318</td>
+            <td class="num">$0.000386</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>List Ticket</td>
+            <td class="num">299,842</td>
+            <td class="num">$16.4913</td>
+            <td class="num">$0.002249</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Buy Ticket (Resale)</td>
+            <td class="num">133,673</td>
+            <td class="num">$7.3520</td>
+            <td class="num">$0.001003</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Transfer Ticket</td>
+            <td class="num">50,648</td>
+            <td class="num">$2.7856</td>
+            <td class="num">$0.000380</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr>
+            <td>Withdraw Funds</td>
+            <td class="num">37,287</td>
+            <td class="num">$2.0508</td>
+            <td class="num">$0.000280</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+          <tr style="font-weight:700; border-top: 2px solid #3f3f46;">
+            <td>TOTAL</td>
+            <td class="num">7,568,558</td>
+            <td class="num">$416.2707</td>
+            <td class="num">$0.056764</td>
+            <td class="num savings">99.99%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="assumptions">
+    <strong>Assumptions:</strong>
+    ETH Price = $2200 | POL Price = $0.25 |
+    Ethereum Gas Price = 25 gwei | Polygon Gas Price = 30 gwei |
+    Gas units are identical on both networks (same EVM bytecode). The cost difference comes entirely from
+    the native token price (ETH vs POL) and typical gas prices on each network.
+  </div>
+
+  <script>
+    const labels = ["Create Event (Clone)","Add Tier","Mint Ticket","Mint 2nd Ticket","Check-In","Set Marketplace","Approve (ERC-721)","List Ticket","Buy Ticket (Resale)","Transfer Ticket","Withdraw Funds"];
+    const ethData = [22.968935000000002,12.05996,11.438955,7.676955,2.926715,2.74934,2.831785,16.491310000000002,7.352015000000001,2.7856400000000003,2.0507850000000003];
+    const polData = [0.0031321275000000003,0.00164454,0.0015598575000000002,0.0010468575000000002,0.0003990975,0.00037491,0.0003861525,0.002248815,0.0010025475,0.00037986000000000004,0.00027965250000000003];
+    const gasData = [417617,219272,207981,139581,53213,49988,51487,299842,133673,50648,37287];
+    const deplLabels = ["Deploy Implementation","Deploy Factory","Deploy Marketplace"];
+    const deplEth = [182.47911000000002,51.884085000000006,90.5751];
+    const deplPol = [0.024883515000000002,0.0070751025,0.01235115];
+
+    const commonOptions = {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#a1a1aa', font: { size: 12 } } },
+      },
+      scales: {
+        x: { ticks: { color: '#71717a', font: { size: 11 } }, grid: { color: '#27272a' } },
+        y: { ticks: { color: '#71717a' }, grid: { color: '#27272a' } },
+      },
+    };
+
+    // Chart 1: Cost comparison (log scale to show both)
+    new Chart(document.getElementById('costChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Ethereum (USD)',
+            data: ethData,
+            backgroundColor: '#3b82f6',
+            borderRadius: 4,
+          },
+          {
+            label: 'Polygon (USD)',
+            data: polData,
+            backgroundColor: '#7c3aed',
+            borderRadius: 4,
+          },
+        ],
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          ...commonOptions.scales,
+          y: {
+            ...commonOptions.scales.y,
+            type: 'logarithmic',
+            title: { display: true, text: 'Cost (USD) — Log Scale', color: '#71717a' },
+          },
+        },
+      },
+    });
+
+    // Chart 2: Gas units
+    new Chart(document.getElementById('gasChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Gas Units',
+          data: gasData,
+          backgroundColor: labels.map((_, i) => {
+            const colors = ['#7c3aed','#3b82f6','#22c55e','#f59e0b','#ef4444','#06b6d4','#ec4899','#8b5cf6','#14b8a6','#f97316'];
+            return colors[i % colors.length];
+          }),
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        ...commonOptions,
+        indexAxis: 'y',
+        plugins: { ...commonOptions.plugins, legend: { display: false } },
+        scales: {
+          x: { ...commonOptions.scales.x, title: { display: true, text: 'Gas Units', color: '#71717a' } },
+          y: { ...commonOptions.scales.y, ticks: { color: '#a1a1aa', font: { size: 11 } } },
+        },
+      },
+    });
+
+    // Chart 3: Deployment costs
+    new Chart(document.getElementById('deployChart'), {
+      type: 'bar',
+      data: {
+        labels: deplLabels,
+        datasets: [
+          { label: 'Ethereum (USD)', data: deplEth, backgroundColor: '#3b82f6', borderRadius: 4 },
+          { label: 'Polygon (USD)', data: deplPol, backgroundColor: '#7c3aed', borderRadius: 4 },
+        ],
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          ...commonOptions.scales,
+          y: { ...commonOptions.scales.y, title: { display: true, text: 'Cost (USD)', color: '#71717a' } },
+        },
+      },
+    });
+  </script>
+</body>
+</html>

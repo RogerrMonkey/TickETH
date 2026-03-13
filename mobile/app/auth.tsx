@@ -243,6 +243,8 @@ export default function AuthScreen() {
                 return !!token;
               },
               async doLogout() {
+                // Guard: skip if already logged out (prevents double-logout race)
+                if (!useAuthStore.getState().user) return;
                 await useAuthStore.getState().logout();
                 useWalletStore.getState().disconnect();
               },

@@ -18,7 +18,9 @@
       "bundleIdentifier": "com.ticketh.app",
       "infoPlist": {
         "NSCameraUsageDescription": "TickETH needs camera access to scan ticket QR codes",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -52,7 +54,8 @@
           "icon": "./assets/icon.png",
           "color": "#6C63FF"
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "extra": {
       "eas": {

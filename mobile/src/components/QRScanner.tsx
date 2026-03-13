@@ -62,28 +62,27 @@ export function QRScanner({ onScan, active = true }: QRScannerProps) {
           barcodeTypes: ['qr'],
         }}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-      >
-        {/* Scan overlay */}
-        <View style={styles.overlay}>
-          <View style={styles.overlayTop} />
-          <View style={styles.overlayMiddle}>
-            <View style={styles.overlaySide} />
-            <View style={styles.scanArea}>
-              {/* Corner markers */}
-              <View style={[styles.corner, styles.cornerTL]} />
-              <View style={[styles.corner, styles.cornerTR]} />
-              <View style={[styles.corner, styles.cornerBL]} />
-              <View style={[styles.corner, styles.cornerBR]} />
-            </View>
-            <View style={styles.overlaySide} />
+      />
+      {/* Scan overlay — positioned absolutely on top of camera */}
+      <View style={[styles.overlay, StyleSheet.absoluteFill]}>
+        <View style={styles.overlayTop} />
+        <View style={styles.overlayMiddle}>
+          <View style={styles.overlaySide} />
+          <View style={styles.scanArea}>
+            {/* Corner markers */}
+            <View style={[styles.corner, styles.cornerTL]} />
+            <View style={[styles.corner, styles.cornerTR]} />
+            <View style={[styles.corner, styles.cornerBL]} />
+            <View style={[styles.corner, styles.cornerBR]} />
           </View>
-          <View style={styles.overlayBottom}>
-            <Text style={styles.scanText}>
-              {scanned ? 'Processing...' : 'Align QR code within frame'}
-            </Text>
-          </View>
+          <View style={styles.overlaySide} />
         </View>
-      </CameraView>
+        <View style={styles.overlayBottom}>
+          <Text style={styles.scanText}>
+            {scanned ? 'Processing...' : 'Align QR code within frame'}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 }

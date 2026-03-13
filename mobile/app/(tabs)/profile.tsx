@@ -45,14 +45,12 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           analytics.track('wallet_disconnected', {});
-          // Navigate first, then disconnect to avoid cascading state changes
-          // killing the app before navigation completes
-          router.replace('/auth');
-          // Small delay to ensure navigation starts before state clears
-          setTimeout(async () => {
+          try {
             await disconnect();
-            showToast({ type: 'info', title: 'Disconnected' });
-          }, 100);
+          } catch { /* ignore */ }
+          // TabLayout's <Redirect href="/auth" /> handles navigation
+          // when user becomes null after disconnect
+          showToast({ type: 'info', title: 'Disconnected' });
         },
       },
     ]);

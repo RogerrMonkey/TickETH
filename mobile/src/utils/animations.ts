@@ -75,7 +75,7 @@ export function useFadeIn(delay = 0) {
 
   useEffect(() => {
     progress.value = withDelay(delay, withTiming(1, TimingPresets.entrance));
-  }, []);
+  }, [delay]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: progress.value,

@@ -3,11 +3,11 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  Pressable,
   ViewStyle,
   TextStyle,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { useScalePress } from '../../utils/animations';
 
@@ -42,29 +42,19 @@ export function Button({
   const isDisabled = disabled || loading;
   const { onPressIn, onPressOut, animatedStyle: scaleStyle } = useScalePress(0.96);
 
-  const tap = Gesture.Tap()
-    .enabled(!isDisabled)
-    .onBegin(() => {
-      'worklet';
-      onPressIn();
-    })
-    .onFinalize(() => {
-      'worklet';
-      onPressOut();
-    })
-    .onEnd(() => {
-      'worklet';
-      if (!isDisabled) {
-        // runOnJS not needed here — we handle via onTouchEnd
-      }
-    });
-
   const handlePress = useCallback(() => {
     if (!isDisabled) onPress();
   }, [isDisabled, onPress]);
 
   return (
-    <GestureDetector gesture={tap}>
+    <Pressable
+      onPress={handlePress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled }}
+    >
       <Animated.View
         style={[
           styles.base,
@@ -75,9 +65,6 @@ export function Button({
           scaleStyle,
           style,
         ]}
-        onTouchEnd={handlePress}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: isDisabled }}
       >
         {loading ? (
           <ActivityIndicator
@@ -101,7 +88,7 @@ export function Button({
           </>
         )}
       </Animated.View>
-    </GestureDetector>
+    </Pressable>
   );
 }
 
