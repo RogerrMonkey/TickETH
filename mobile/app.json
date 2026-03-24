@@ -32,7 +32,9 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "CAMERA",
-        "VIBRATE"
+        "VIBRATE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -59,8 +61,10 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "ticketh-mobile"
-      }
-    }
+        "projectId": "72151161-356a-49ac-8e60-f65b2bbcf713"
+      },
+      "router": {}
+    },
+    "owner": "rogerr"
   }
 }
